@@ -11,6 +11,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -23,6 +24,7 @@ data class TaskUiState(
     val recurrenceError: String? = null,
     val settingsError: String? = null,
     val savedTaskId: Long? = null,
+    val feedbackSession: Long = 0,
     val settingsSaved: Boolean = false,
 )
 
@@ -46,9 +48,16 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
         mutableState.update { it.copy(titleError = titleError, recurrenceError = recurrenceError, error = null) }
         if (titleError != null || recurrenceError != null) return
         val input = validateTaskInput(title, days!!)
+        val originatingSession = state.value.feedbackSession
         mutate {
             val savedId = repository.saveTask(id, input.title, input.recurrenceDays)
-            mutableState.update { it.copy(savedTaskId = savedId) }
+            val acknowledged = state.first { current ->
+                current.error != null || current.snapshot?.tasks?.any {
+                    it.id == savedId && it.title == input.title && it.recurrenceDays == input.recurrenceDays
+                } == true
+            }
+            check(acknowledged.error == null)
+            mutableState.update { if (it.feedbackSession == originatingSession) it.copy(savedTaskId = savedId) else it }
         }
     }
 
@@ -68,7 +77,8 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
 
     fun completeTask(id: Long) = mutate { repository.completeTask(id) }
     fun setArchived(id: Long, archived: Boolean) = mutate { repository.setArchived(id, archived) }
-    fun clearFeedback() = mutableState.update { it.copy(error = null, titleError = null, recurrenceError = null, settingsError = null, savedTaskId = null, settingsSaved = false) }
+    // Entering or leaving a screen invalidates feedback owned by the previous session.
+    fun clearFeedback() = mutableState.update { it.copy(feedbackSession = it.feedbackSession + 1, error = null, titleError = null, recurrenceError = null, settingsError = null, savedTaskId = null, settingsSaved = false) }
 
     private fun mutate(action: suspend () -> Unit) {
         if (state.value.saving) return

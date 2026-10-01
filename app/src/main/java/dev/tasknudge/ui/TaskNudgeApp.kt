@@ -62,8 +62,10 @@ fun TaskNudgeApp(repository: TaskRepository, notificationsEnabled: Boolean, onEn
     }
     LaunchedEffect(state.savedTaskId, state.settingsSaved, snapshot) {
         state.savedTaskId?.takeIf { id -> snapshot?.tasks?.any { it.id == id } == true }?.let { id ->
-            if (screen == "editor") { selectedId = id; screen = "detail" }
-            vm.clearFeedback()
+            if (state.feedbackSession == vm.state.value.feedbackSession) {
+                if (screen == "editor") { selectedId = id; screen = "detail" }
+                vm.clearFeedback()
+            }
         }
         if (state.settingsSaved) {
             if (screen == "settings") screen = "list"
