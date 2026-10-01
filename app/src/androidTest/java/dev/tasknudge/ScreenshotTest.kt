@@ -50,13 +50,17 @@ class ScreenshotTest {
 
     @Test fun rotationKeepsDraftAndLargeFontKeepsActionsReachable() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-            compose.onNodeWithContentDescription("タスクを追加").performClick()
-            compose.onNodeWithText("タイトル").performTextInput("回転しても残る下書き")
-            scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
-            compose.waitUntil(10_000) { var landscape = false; scenario.onActivity { landscape = it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }; landscape }
-            compose.onNodeWithText("回転しても残る下書き").assertExists()
-            compose.onNodeWithText("保存").assertIsDisplayed()
-            scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            try {
+                compose.onNodeWithContentDescription("タスクを追加").performClick()
+                compose.onNodeWithText("タイトル").performTextInput("回転しても残る下書き")
+                scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+                compose.waitUntil(10_000) { var landscape = false; scenario.onActivity { landscape = it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }; landscape }
+                compose.onNodeWithText("回転しても残る下書き").assertExists()
+                compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed()
+            } finally {
+                scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+                compose.waitUntil(10_000) { var portrait = false; scenario.onActivity { portrait = it.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT }; portrait }
+            }
         }
         // Apply a system font scale and recreate a real Activity, then restore it.
         shell("settings put system font_scale 1.8")
@@ -78,21 +82,15 @@ class ScreenshotTest {
     }
 
     @Test fun deniedNotificationPermissionStillAllowsManualTracking() {
-        if (Build.VERSION.SDK_INT < 33) return
-        instrumentation.uiAutomation.grantRuntimePermission(app.packageName, Manifest.permission.POST_NOTIFICATIONS)
-        instrumentation.uiAutomation.revokeRuntimePermission(app.packageName, Manifest.permission.POST_NOTIFICATIONS)
-        try {
-            ActivityScenario.launch(MainActivity::class.java).use {
-                compose.onNodeWithText("通知が無効です").assertIsDisplayed()
-                compose.onNodeWithContentDescription("タスクを追加").performClick()
-                compose.onNodeWithText("タイトル").performTextInput("通知なしでも記録")
-                compose.onNodeWithText("保存").performClick()
-                compose.onNodeWithText("実行履歴（0回）").assertIsDisplayed()
-                compose.onNodeWithText("完了").performClick()
-                compose.onNodeWithText("実行履歴（1回）").assertIsDisplayed()
-            }
-        } finally {
-            instrumentation.uiAutomation.grantRuntimePermission(app.packageName, Manifest.permission.POST_NOTIFICATIONS)
+        app.resetFixture(notificationsEnabled = false)
+        ActivityScenario.launch(MainActivity::class.java).use {
+            compose.onNodeWithText("通知が無効です").assertIsDisplayed()
+            compose.onNodeWithContentDescription("タスクを追加").performClick()
+            compose.onNodeWithText("タイトル").performTextInput("通知なしでも記録")
+            compose.onNodeWithText("保存").performClick()
+            compose.onNodeWithText("実行履歴（0回）").assertIsDisplayed()
+            compose.onNodeWithText("完了").performClick()
+            compose.onNodeWithText("実行履歴（1回）").assertIsDisplayed()
         }
     }
 
@@ -100,10 +98,14 @@ class ScreenshotTest {
         val taskId = app.container.repository.saveTask(null, "首のストレッチ", 1)
         app.container.repository.saveTask(null, "水を飲む", 1)
         app.container.repository.completeTask(taskId)
+        assertEquals(2, app.container.repository.snapshots.first().tasks.size)
         ActivityScenario.launch(MainActivity::class.java).use {
+            compose.onNodeWithContentDescription("タスクを追加").assertIsDisplayed()
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText("首のストレッチ"))
             compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
             capture("tasks")
             compose.onNodeWithText("首のストレッチ").performClick()
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText("実行履歴（1回）"))
             compose.onNodeWithText("実行履歴（1回）").assertIsDisplayed()
             capture("history")
             compose.onNodeWithContentDescription("戻る").performClick()

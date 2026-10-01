@@ -71,7 +71,9 @@ Task1–3 の実装・修正担当は **gpt-6.1-sol high**。architecture review
 - 担当: `/root/task4_implementation`。作業場所はこの worktree。開始点 `910a682`。元 Task4 brief は `.superpowers/sdd/2026-09-30-task-nudge/task-4-brief.md`、進捗は同ディレクトリの `task-4-report.md`。
 - 追加済み: 実 Room + Android 通知 + Receiver の instrumented tests、実 Activity/Compose の操作・通知タップ・回転・文字拡大・権限拒否・スクリーンショット tests、`scripts/check.sh` / `scripts/device-smoke.sh`、SHA 固定の GitHub Actions workflow。
 - ホスト gate は provisioned runner で `:core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --max-workers=1` が exit 0。**端末実行は未確認**。次は feature branch push 後の API35 CI emulator 結果を調べ、失敗を修正する。
-- README / `docs/testing.md` / 実スクリーンショットはこの checkpoint の後に追加する。CI の実画像を確認する前にスクリーンショット完成を主張しない。
+- CI run [36874951511](https://github.com/yutotamura55/task-nudge/actions/runs/36874951511) は setup-android が削除済み `tools` package を要求して project task 前に失敗。両 job に `packages: platform-tools` を明示した `319875f` を push。次の [36875126874](https://github.com/yutotamura55/task-nudge/actions/runs/36875126874) は verify 成功（core34/app67、lint0 errors・2 warnings）だが device job で 23 件開始、5 件完了中 3 件失敗後に instrumentation process が終了。
+- device 報告と logcat の原因: 回転後 landscape + keyboard で保存ボタンはスクロール前の画面外、失敗時に portrait へ戻らず次の screenshot test に影響、許可 revoke は instrumented process の UID を kill。修正はスクロール可能性の確認、必ず portrait 復元、データ観測後 screenshot、拒否 UI にはテスト用の通知無効 gateway 注入。実通知/Receiver テストは引き続き実 Android gateway を使用。次の CI run で全 23 件を実行し直す。
+- README / `docs/testing.md` はローカル commit `31e210d` に追加。実スクリーンショットはまだなく、CI の実画像を確認する前に完成を主張しない。setup-android の Node20 deprecation annotation は SDK setup 成功後も残る既知 warning。
 
 ## 残る工程
 
@@ -80,7 +82,7 @@ Task1–3 の実装・修正担当は **gpt-6.1-sol high**。architecture review
 3. 全差分を main base `7b401f0` と比較して独立レビュー。下記の確認済み非GPT CLIを優先。
 4. material findingsを修正・必要な再検証・scoped review後、`gh pr create`。PR URL、検証、reviewer/model/findings を報告。PRはまだ未作成。
 
-端末テストはまだ実行していない。再設計後の16 UI casesはcompile済み。local KVMは使用不可なので API35 Google APIs x86_64 emulatorをCIで動かす。OEM/reboot/force-stopの実機確認は未実行と明記する。
+端末テストは API35 emulator で一度起動したが全件成功には至っていない。local KVMは使用不可なので CI の再実行が必要。OEM/reboot/force-stopの実機確認は未実行と明記する。
 
 ## Toolchain と実行
 
