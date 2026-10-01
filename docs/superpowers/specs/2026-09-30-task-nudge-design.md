@@ -2,7 +2,7 @@
 
 ## 目的と合意範囲
 
-首・腕・腰のストレッチなど、忘れがちな小さな行動を思い出し、通知から完了・保留できる個人用 Android アプリ。毎日の未完了項目を積み上げず、最後に実行してから最も時間が経ったものを一つずつ知らせる。元のアイデアは [my-software-ideas #11](https://github.com/yutotamura55/my-software-ideas/issues/11)。このリポジトリの PR はその Issue を参照し、自動 close しない。
+首・腕・腰のストレッチなど、忘れがちな小さな行動を思い出し、通知から完了・保留できる個人用 Android アプリ。毎日の未完了項目を積み上げず、最後に実行してから最も時間が経ったものを一つずつ知らせる。元のアイデアは [my-software-ideas #11](https://github.com/yutotamura55/my-software-ideas/issues/11)。PR 作成時に合意した Issue の範囲を満たすか評価し、完了していれば cross-repository closing keyword を記載する。部分対応なら通常リンクと残作業を記載する。
 
 ユーザーは設計・実装・独立レビュー・PR 作成と subagent-driven-development を承認済み。以下の時刻・入力上限・技術構成は、未指定部分を具体化した初期値である。
 
