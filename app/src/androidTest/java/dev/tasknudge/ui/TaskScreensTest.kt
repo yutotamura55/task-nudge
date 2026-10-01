@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.data.*
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
 import org.junit.Rule
@@ -34,8 +35,26 @@ class TaskScreensTest {
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil { repo.pendingTask != null }
         compose.onNodeWithText("タイトル").assertIsDisplayed()
+        compose.onNodeWithText("保存中…").assertIsNotEnabled().performClick()
+        compose.runOnIdle { assertEquals(1, repo.saveCalls) }
         compose.runOnIdle { repo.data.value = repo.data.value.copy(tasks = listOf(repo.pendingTask!!)) }
         compose.onNodeWithText("実行履歴（0回）").assertIsDisplayed()
+    }
+    @Test fun suspendedSaveCannotDiscardAnotherEditorDraft() {
+        val repo = ScreenRepository().apply { gate = CompletableDeferred() }; launch(repo)
+        compose.onNodeWithContentDescription("タスクを追加").performClick()
+        compose.onNodeWithText("タイトル").performTextInput("首")
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil { repo.saveCalls == 1 }
+        compose.onNodeWithContentDescription("戻る").performClick()
+        compose.onNodeWithContentDescription("タスクを追加").performClick()
+        compose.onNodeWithText("タイトル").performTextInput("腰の下書き")
+        compose.runOnIdle { repo.gate!!.complete(Unit) }
+        compose.waitUntil { repo.data.value.tasks.size == 1 }
+        compose.onNodeWithText("タイトル").assertIsDisplayed()
+        compose.onNodeWithText("腰の下書き").assertIsDisplayed()
+        compose.onNodeWithText("保存").assertIsEnabled()
+        assertEquals("首", repo.data.value.tasks.single().title)
     }
     @Test fun inputErrorsRemainInlineAndDoNotSave() {
         val repo = ScreenRepository(); launch(repo)
@@ -130,9 +149,13 @@ class TaskScreensTest {
 private fun sampleTask() = TaskSnapshot(1, "首", 1, false, Instant.EPOCH, null, listOf(CompletionRecord(1, Instant.parse("2026-09-30T10:00:00Z"), LocalDate.of(2026, 9, 30))))
 private class ScreenRepository(tasks: List<TaskSnapshot> = emptyList(), private val publishSaves: Boolean = true) : TaskRepository {
     var pendingTask: TaskSnapshot? = null
+    var saveCalls = 0
+    var gate: CompletableDeferred<Unit>? = null
     val data = MutableStateFlow(AppSnapshot(tasks, ReminderSettings(), false))
     override val snapshots = data
     override suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int): Long {
+        saveCalls++
+        gate?.await()
         val taskId = id ?: (data.value.tasks.maxOfOrNull { it.id } ?: 0) + 1
         val task = data.value.tasks.find { it.id == taskId }?.copy(title = title, recurrenceDays = recurrenceDays)
             ?: TaskSnapshot(taskId, title, recurrenceDays, false, Instant.now(), null, emptyList())

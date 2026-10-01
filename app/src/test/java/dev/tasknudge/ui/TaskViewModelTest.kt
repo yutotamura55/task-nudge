@@ -63,6 +63,43 @@ class TaskViewModelTest {
         repo.gate!!.complete(Unit); runCurrent()
         assertFalse(vm.state.value.saving)
     }
+    @Test fun preventsDuplicateAddsUntilSnapshotAcknowledgesSavedTask() = runTest(dispatcher) {
+        val repo = FakeRepository().apply { publishSaves = false }; val vm = TaskViewModel(repo)
+        vm.saveTask(null, "首", "1"); runCurrent()
+        assertTrue(vm.state.value.saving)
+        vm.saveTask(null, "首", "1"); runCurrent()
+        assertEquals(1, repo.saved.size)
+        repo.publishPending(); runCurrent()
+        assertFalse(vm.state.value.saving)
+        assertEquals(1L, vm.state.value.savedTaskId)
+    }
+    @Test fun editAcknowledgementRequiresSavedValues() = runTest(dispatcher) {
+        val repo = FakeRepository().apply { publishSaves = false }; val vm = TaskViewModel(repo)
+        repo.data.emit(AppSnapshot(listOf(task(1)), ReminderSettings(), false)); runCurrent()
+        vm.saveTask(1, "腕", "3"); runCurrent()
+        assertTrue(vm.state.value.saving)
+        assertNull(vm.state.value.savedTaskId)
+        repo.publishPending(); runCurrent()
+        assertFalse(vm.state.value.saving)
+        assertEquals(1L, vm.state.value.savedTaskId)
+    }
+    @Test fun leavingOriginEditorInvalidatesSuspendedSaveNavigation() = runTest(dispatcher) {
+        val repo = FakeRepository().apply { gate = CompletableDeferred() }; val vm = TaskViewModel(repo)
+        vm.saveTask(null, "首", "1"); runCurrent()
+        vm.clearFeedback() // Leaving A and opening B starts a different feedback session.
+        repo.gate!!.complete(Unit); runCurrent()
+        assertNull(vm.state.value.savedTaskId)
+        assertEquals("首", vm.state.value.snapshot!!.tasks.single().title)
+        assertFalse(vm.state.value.saving)
+    }
+    @Test fun leavingOriginEditorWhileWaitingForSnapshotInvalidatesNavigation() = runTest(dispatcher) {
+        val repo = FakeRepository().apply { publishSaves = false }; val vm = TaskViewModel(repo)
+        vm.saveTask(null, "首", "1"); runCurrent()
+        vm.clearFeedback()
+        repo.publishPending(); runCurrent()
+        assertNull(vm.state.value.savedTaskId)
+        assertFalse(vm.state.value.saving)
+    }
     @Test fun repositoryFailureIsVisibleAndCanRetry() = runTest(dispatcher) {
         val repo = FakeRepository().apply { fail = true }; val vm = TaskViewModel(repo)
         vm.saveTask(null, "首", "1"); runCurrent()
@@ -114,9 +151,19 @@ private class FakeRepository(private val emitFailure: Boolean = false) : TaskRep
     val settings = mutableListOf<ReminderSettings>()
     var gate: CompletableDeferred<Unit>? = null
     var fail = false
+    var publishSaves = true
+    var pending: TaskSnapshot? = null
     override suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int): Long {
         if (fail) error("disk")
-        saved += SavedInput(id, title, recurrenceDays); gate?.await(); return id ?: 1
+        saved += SavedInput(id, title, recurrenceDays); gate?.await()
+        val savedId = id ?: 1
+        pending = task(savedId).copy(title = title, recurrenceDays = recurrenceDays)
+        if (publishSaves) publishPending()
+        return savedId
+    }
+    suspend fun publishPending() {
+        val snapshot = data.replayCache.lastOrNull() ?: AppSnapshot(emptyList(), ReminderSettings(), false)
+        data.emit(snapshot.copy(tasks = snapshot.tasks.filterNot { it.id == pending!!.id } + pending!!))
     }
     override suspend fun completeTask(id: Long) {
         data.emit(data.replayCache.last().let { it.copy(tasks = it.tasks.map { task -> if (task.id == id) task.copy(completions = listOf(CompletionRecord(1, Instant.EPOCH, LocalDate.of(2026, 10, 1)))) else task }) })
