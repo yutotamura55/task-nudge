@@ -63,6 +63,11 @@ class ScreenshotTest {
         try {
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 scenario.recreate()
+                compose.waitUntil(10_000) {
+                    var enlarged = false
+                    scenario.onActivity { enlarged = it.resources.configuration.fontScale >= 1.7f }
+                    enlarged
+                }
                 compose.onNodeWithContentDescription("タスクを追加").performClick()
                 compose.onNodeWithText("タイトル").performTextInput("大きな文字でも追加")
                 compose.onNodeWithText("保存").assertIsDisplayed()
@@ -74,6 +79,7 @@ class ScreenshotTest {
 
     @Test fun deniedNotificationPermissionStillAllowsManualTracking() {
         if (Build.VERSION.SDK_INT < 33) return
+        instrumentation.uiAutomation.grantRuntimePermission(app.packageName, Manifest.permission.POST_NOTIFICATIONS)
         instrumentation.uiAutomation.revokeRuntimePermission(app.packageName, Manifest.permission.POST_NOTIFICATIONS)
         try {
             ActivityScenario.launch(MainActivity::class.java).use {
