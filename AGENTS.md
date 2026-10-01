@@ -6,6 +6,7 @@ Read the workspace AGENTS.md and the design/plan in docs/superpowers before impl
 - Keep the app offline. Do not add INTERNET permission, accounts, analytics, a server, exact alarm permissions, or foreground services.
 - Follow `docs/superpowers/specs/2026-09-30-task-nudge-design.md` for date, snooze, permission, and notification generation semantics. All writes and notification side effects use the shared engine mutation boundary.
 - Keep Room schemas in git; never use destructive migration. Never commit local.properties, SDKs, Gradle caches, signing keys, or credentials.
+- Follow `docs/superpowers/specs/2026-10-01-command-boundaries.md`: distinguish committed writes, retryable observation, and screen-owned operation results. Repeated fixes at one boundary require reassessing its state ownership and changeability; passing tests alone does not establish design quality.
 - Fetch the remote default branch before new independent work; use dedicated feat/fix/chore branches. Current MVP work uses feat/11-task-reminders.
 - The user selected subagent-driven-development for this MVP. Review each task and the complete diff independently. Prefer a read-only CLI review with a confirmed non-GPT model; document fallback if unavailable.
 - Only the user merges. Do not push directly to main, merge PRs, enable auto-merge, or enqueue a PR.
