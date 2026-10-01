@@ -4,6 +4,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.data.*
 import kotlinx.coroutines.CompletableDeferred
@@ -106,11 +107,11 @@ class TaskScreensTest {
     @Test fun oldDetailCompleteCallbackCannotRunInAnotherScreenSession() {
         val repo = ScreenRepository(listOf(sampleTask(), sampleTask().copy(id = 2, title = "腰")))
         launch(repo, initial = 1)
-        val oldComplete = compose.onNodeWithText("完了").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        val oldComplete = compose.onNode(hasText("完了") and hasClickAction()).fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
         compose.onNodeWithContentDescription("戻る").performClick()
         compose.onNodeWithText("腰").performClick()
         compose.runOnIdle { oldComplete() }
-        compose.onNodeWithText("完了").assertIsEnabled()
+        compose.onNode(hasText("完了") and hasClickAction()).assertIsEnabled()
         compose.runOnIdle { assertEquals(1, repo.data.value.tasks.single { it.id == 1L }.completions.size) }
     }
     @Test fun oldListCompleteCallbackCannotRunAfterOpeningSettings() {
@@ -134,7 +135,7 @@ class TaskScreensTest {
         compose.onNodeWithText("繰り返しを設定").performClick()
         compose.onNodeWithText("繰り返し（日）").performTextReplacement("0")
         compose.onNodeWithText("保存").performClick()
-        compose.onNodeWithText("繰り返しは1〜365日の整数で入力してください").assertIsDisplayed()
+        compose.onNodeWithText("繰り返しは1〜365日の整数で入力してください").performScrollTo().assertIsDisplayed()
         assertTrue(repo.data.value.tasks.isEmpty())
     }
     @Test fun deniedPermissionIsExplainedAndOnlyExplicitButtonRequests() {
@@ -165,8 +166,15 @@ class TaskScreensTest {
         compose.onNodeWithContentDescription("通知設定").performClick()
         compose.onNodeWithText("開始（時）").performTextReplacement("24")
         compose.onNodeWithText("終了（時）").performTextReplacement("24")
+        assertEquals("24", compose.onNodeWithText("開始（時）").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        assertEquals("24", compose.onNodeWithText("終了（時）").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
+        compose.onNodeWithText("保存").assertIsEnabled()
         compose.onNodeWithText("保存").performClick()
-        compose.onNodeWithTag("settingsError").assertExists()
+        val message = "開始は0〜23時、終了は1〜24時の整数で、開始より後に設定してください。間隔は30・60・120分です。"
+        compose.onRoot(useUnmergedTree = true).printToLog("TaskSettingsInvalid")
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("settingsError", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(message, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
+        assertEquals(ReminderSettings(), repo.data.value.settings)
         compose.onNodeWithText("開始（時）").performTextReplacement("0")
         compose.onNodeWithText("120分").performClick()
         compose.onNodeWithText("保存").performClick()

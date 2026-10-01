@@ -40,9 +40,9 @@ class ScreenshotTest {
             compose.onNodeWithContentDescription("タスクを追加").performClick()
             compose.onNodeWithText("タイトル").performTextInput("首のストレッチ")
             compose.onNodeWithText("保存").performClick()
-            compose.onNodeWithText("実行履歴（0回）").assertIsDisplayed()
+            compose.onNodeWithText("実行履歴（0回）").performScrollTo().assertIsDisplayed()
             compose.onNodeWithText("完了").performClick()
-            compose.onNodeWithText("実行履歴（1回）").assertIsDisplayed()
+            compose.onNodeWithText("実行履歴（1回）").performScrollTo().assertIsDisplayed()
             compose.onNodeWithText("今日完了済み").assertIsNotEnabled()
             runBlocking { assertEquals(1, app.container.repository.snapshots.first().tasks.single().completions.size) }
         }
@@ -88,9 +88,9 @@ class ScreenshotTest {
             compose.onNodeWithContentDescription("タスクを追加").performClick()
             compose.onNodeWithText("タイトル").performTextInput("通知なしでも記録")
             compose.onNodeWithText("保存").performClick()
-            compose.onNodeWithText("実行履歴（0回）").assertIsDisplayed()
+            compose.onNodeWithText("実行履歴（0回）").performScrollTo().assertIsDisplayed()
             compose.onNodeWithText("完了").performClick()
-            compose.onNodeWithText("実行履歴（1回）").assertIsDisplayed()
+            compose.onNodeWithText("実行履歴（1回）").performScrollTo().assertIsDisplayed()
         }
     }
 
@@ -127,11 +127,11 @@ class ScreenshotTest {
             notification.notification.contentIntent.send()
             activity = instrumentation.waitForMonitorWithTimeout(monitor, 10_000) as? MainActivity
             assertNotNull("Notification tap should launch MainActivity", activity)
-            compose.onNodeWithText("実行履歴（0回）").assertIsDisplayed()
+            compose.onNodeWithText("実行履歴（0回）").performScrollTo().assertIsDisplayed()
             compose.onNodeWithContentDescription("戻る").performClick()
             compose.onNodeWithContentDescription("タスクを追加").assertIsDisplayed()
             notification.notification.contentIntent.send()
-            compose.onNodeWithText("実行履歴（0回）").assertIsDisplayed()
+            compose.onNodeWithText("実行履歴（0回）").performScrollTo().assertIsDisplayed()
             assertEquals(taskId, notification.notification.extras.getLong("taskId"))
         } finally {
             activity?.runOnUiThread { activity?.finish() }
