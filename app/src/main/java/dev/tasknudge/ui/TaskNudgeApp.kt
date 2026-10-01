@@ -79,24 +79,30 @@ fun TaskNudgeApp(repository: TaskRepository, notificationsEnabled: Boolean, onEn
             }
         }
     }
-    fun back() {
-        navigate(if (screen == "editor" && selectedId != null) "detail" else "list")
+    val owner = sessionId
+    val shownScreen = screen
+    val shownTaskId = selectedId
+    fun navigateFrom(ownerId: Long, destination: String, id: Long?) {
+        if (sessionId == ownerId) navigate(destination, id)
     }
-    BackHandler(enabled = screen != "list") { back() }
+    fun backFrom(ownerId: Long, source: String, taskId: Long?) {
+        navigateFrom(ownerId, if (source == "editor" && taskId != null) "detail" else "list", taskId)
+    }
+    BackHandler(enabled = screen != "list") { backFrom(owner, shownScreen, shownTaskId) }
     Scaffold(
         modifier = Modifier.fillMaxSize().imePadding(),
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
             TopAppBar(title = { Text(when (screen) { "editor" -> if (selectedId == null) "タスクを追加" else "タスクを編集"; "detail" -> "タスクの詳細"; "settings" -> "通知設定"; else -> "タスク" }) },
                 navigationIcon = {
-                    if (screen != "list") TextButton(onClick = { back() }, modifier = Modifier.semantics { contentDescription = "戻る" }) { Text("戻る") }
+                    if (screen != "list") TextButton(onClick = { backFrom(owner, shownScreen, shownTaskId) }, modifier = Modifier.semantics { contentDescription = "戻る" }) { Text("戻る") }
                 },
                 actions = {
-                    if (screen == "list") TextButton(onClick = { navigate("settings") }, modifier = Modifier.semantics { contentDescription = "通知設定" }) { Text("設定") }
+                    if (screen == "list") TextButton(onClick = { navigateFrom(owner, "settings", shownTaskId) }, modifier = Modifier.semantics { contentDescription = "通知設定" }) { Text("設定") }
                 })
         },
         floatingActionButton = {
-            if (screen == "list" && snapshot != null) FloatingActionButton(onClick = { navigate("editor", null) }, modifier = Modifier.semantics { contentDescription = "タスクを追加" }) { Text("＋", style = MaterialTheme.typography.headlineSmall) }
+            if (screen == "list" && snapshot != null) FloatingActionButton(onClick = { navigateFrom(owner, "editor", null) }, modifier = Modifier.semantics { contentDescription = "タスクを追加" }) { Text("＋", style = MaterialTheme.typography.headlineSmall) }
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
@@ -107,7 +113,7 @@ fun TaskNudgeApp(repository: TaskRepository, notificationsEnabled: Boolean, onEn
                 }
                 (state.operation.state as? OperationState.Failed)?.let { failure ->
                     Text(failure.message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
-                    TextButton(onClick = { vm.dismissOperationError(sessionId) }) { Text("エラーを閉じる") }
+                    TextButton(onClick = { vm.dismissOperationError(owner) }) { Text("エラーを閉じる") }
                 }
                 // Keep an existing screen/draft visible during read retry or failure.
                 key(sessionId) {
@@ -115,13 +121,17 @@ fun TaskNudgeApp(repository: TaskRepository, notificationsEnabled: Boolean, onEn
                         snapshot == null && state.loading -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.semantics { contentDescription = "読み込み中" }) }
                         snapshot == null -> Text("データを表示できません。再読み込みしてください。", modifier = Modifier.padding(16.dp))
                         screen == "editor" -> {
+                            val taskId = shownTaskId
                             val savedId = ((state.operation.state as? OperationState.Committed)?.result as? OperationResult.TaskSaved)?.id
                             if (savedId != null && snapshot.tasks.none { it.id == savedId }) Text("保存済み・データ表示待ち", modifier = Modifier.padding(16.dp))
-                            TaskEditorScreen(task, state) { title, recurrence -> vm.saveTask(selectedId, title, recurrence, sessionId) }
+                            TaskEditorScreen(task, state) { title, recurrence -> vm.saveTask(taskId, title, recurrence, owner) }
                         }
-                        screen == "settings" -> SettingsScreen(snapshot.settings, snapshot.permissionRequested, notificationsEnabled, state, onEnableNotifications) { start, end, interval -> vm.saveSettings(start, end, interval, sessionId) }
-                        screen == "detail" && task != null -> TaskDetailScreen(task, !state.canSubmit, now, ZoneId.systemDefault(), { navigate("editor") }, { vm.completeTask(task.id, sessionId) }, { vm.setArchived(task.id, it, sessionId) })
-                        else -> TaskListScreen(snapshot.tasks, showArchived, { showArchived = it }, notificationsEnabled, snapshot.permissionRequested, onEnableNotifications, !state.canSubmit, now, ZoneId.systemDefault(), { navigate("detail", it) }, { vm.completeTask(it, sessionId) })
+                        screen == "settings" -> SettingsScreen(snapshot.settings, snapshot.permissionRequested, notificationsEnabled, state, { if (sessionId == owner) onEnableNotifications() }) { start, end, interval -> vm.saveSettings(start, end, interval, owner) }
+                        screen == "detail" && task != null -> {
+                            val taskId = task.id
+                            TaskDetailScreen(task, !state.canSubmit, now, ZoneId.systemDefault(), { navigateFrom(owner, "editor", taskId) }, { vm.completeTask(taskId, owner) }, { vm.setArchived(taskId, it, owner) })
+                        }
+                        else -> TaskListScreen(snapshot.tasks, showArchived, { if (sessionId == owner) showArchived = it }, notificationsEnabled, snapshot.permissionRequested, { if (sessionId == owner) onEnableNotifications() }, !state.canSubmit, now, ZoneId.systemDefault(), { navigateFrom(owner, "detail", it) }, { vm.completeTask(it, owner) })
                     }
                 }
             }
