@@ -36,10 +36,19 @@ fun TaskNudgeApp(repository: TaskRepository, notificationsEnabled: Boolean, onEn
         }
     }
     val vm: TaskViewModel = viewModel(factory = factory)
-    val state by vm.state.collectAsStateWithLifecycle()
     var screen by rememberSaveable { mutableStateOf(if (initialTaskId == null) "list" else "detail") }
     var selectedId by rememberSaveable { mutableStateOf(initialTaskId) }
     var routedTaskId by rememberSaveable { mutableStateOf(initialTaskId) }
+    var sessionId by rememberSaveable { mutableLongStateOf(vm.beginScreenSession()) }
+    // A retained ViewModel keeps its operation on rotation; a new ViewModel after
+    // process recreation adopts the restored route's owner before receiving input.
+    remember(vm, sessionId) { vm.beginScreenSession(sessionId) }
+    val state by vm.state.collectAsStateWithLifecycle()
+    fun navigate(destination: String, id: Long? = selectedId) {
+        sessionId = vm.beginScreenSession()
+        selectedId = id
+        screen = destination
+    }
     var showArchived by rememberSaveable { mutableStateOf(false) }
     var now by remember { mutableStateOf(Instant.now()) }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -50,31 +59,28 @@ fun TaskNudgeApp(repository: TaskRepository, notificationsEnabled: Boolean, onEn
     }
     LaunchedEffect(initialTaskId) {
         if (initialTaskId != null && initialTaskId != routedTaskId) {
-            routedTaskId = initialTaskId; selectedId = initialTaskId; screen = "detail"
+            routedTaskId = initialTaskId; navigate("detail", initialTaskId)
         }
     }
     val snapshot = state.snapshot
     val task = snapshot?.tasks?.find { it.id == selectedId }
-    LaunchedEffect(screen, selectedId, snapshot) {
-        if (!state.loading && snapshot != null && selectedId != null && task == null && (screen == "detail" || screen == "editor")) {
-            selectedId = null; screen = "list"
+    LaunchedEffect(screen, selectedId, state.observation) {
+        if (state.observation.status == ObservationStatus.Ready && selectedId != null && task == null && (screen == "detail" || screen == "editor")) {
+            navigate("list", null)
         }
     }
-    LaunchedEffect(state.savedTaskId, state.settingsSaved, snapshot) {
-        state.savedTaskId?.takeIf { id -> snapshot?.tasks?.any { it.id == id } == true }?.let { id ->
-            if (state.feedbackSession == vm.state.value.feedbackSession) {
-                if (screen == "editor") { selectedId = id; screen = "detail" }
-                vm.clearFeedback()
+    LaunchedEffect(state.operation, snapshot, sessionId) {
+        if (state.operation.sessionId == sessionId && vm.state.value.operation.sessionId == sessionId) {
+            when (val result = (state.operation.state as? OperationState.Committed)?.result) {
+                is OperationResult.TaskSaved -> if (screen == "editor" && snapshot?.tasks?.any { it.id == result.id } == true) navigate("detail", result.id)
+                OperationResult.SettingsSaved -> if (screen == "settings") navigate("list")
+                OperationResult.Updated -> vm.consumeOperation(sessionId)
+                null -> Unit
             }
-        }
-        if (state.settingsSaved) {
-            if (screen == "settings") screen = "list"
-            vm.clearFeedback()
         }
     }
     fun back() {
-        screen = if (screen == "editor" && selectedId != null) "detail" else "list"
-        vm.clearFeedback()
+        navigate(if (screen == "editor" && selectedId != null) "detail" else "list")
     }
     BackHandler(enabled = screen != "list") { back() }
     Scaffold(
@@ -86,23 +92,37 @@ fun TaskNudgeApp(repository: TaskRepository, notificationsEnabled: Boolean, onEn
                     if (screen != "list") TextButton(onClick = { back() }, modifier = Modifier.semantics { contentDescription = "戻る" }) { Text("戻る") }
                 },
                 actions = {
-                    if (screen == "list") TextButton(onClick = { vm.clearFeedback(); screen = "settings" }, modifier = Modifier.semantics { contentDescription = "通知設定" }) { Text("設定") }
+                    if (screen == "list") TextButton(onClick = { navigate("settings") }, modifier = Modifier.semantics { contentDescription = "通知設定" }) { Text("設定") }
                 })
         },
         floatingActionButton = {
-            if (screen == "list" && snapshot != null) FloatingActionButton(onClick = { vm.clearFeedback(); selectedId = null; screen = "editor" }, modifier = Modifier.semantics { contentDescription = "タスクを追加" }) { Text("＋", style = MaterialTheme.typography.headlineSmall) }
+            if (screen == "list" && snapshot != null) FloatingActionButton(onClick = { navigate("editor", null) }, modifier = Modifier.semantics { contentDescription = "タスクを追加" }) { Text("＋", style = MaterialTheme.typography.headlineSmall) }
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
             Column(Modifier.widthIn(max = 720.dp).fillMaxWidth()) {
-                state.error?.let { error -> Text(error, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
-                when {
-                    state.loading -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.semantics { contentDescription = "読み込み中" }) }
-                    snapshot == null -> Text("データを表示できません。アプリを開き直してください。", modifier = Modifier.padding(16.dp))
-                    screen == "editor" -> TaskEditorScreen(task, state) { title, recurrence -> vm.saveTask(selectedId, title, recurrence) }
-                    screen == "settings" -> SettingsScreen(snapshot.settings, snapshot.permissionRequested, notificationsEnabled, state, onEnableNotifications, vm::saveSettings)
-                    screen == "detail" && task != null -> TaskDetailScreen(task, state.saving, now, ZoneId.systemDefault(), { vm.clearFeedback(); screen = "editor" }, { vm.completeTask(task.id) }, { vm.setArchived(task.id, it) })
-                    else -> TaskListScreen(snapshot.tasks, showArchived, { showArchived = it }, notificationsEnabled, snapshot.permissionRequested, onEnableNotifications, state.saving, now, ZoneId.systemDefault(), { selectedId = it; vm.clearFeedback(); screen = "detail" }, vm::completeTask)
+                (state.observation.status as? ObservationStatus.Failed)?.let { failure ->
+                    Text(failure.message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
+                    TextButton(onClick = vm::retryObservation) { Text("再読み込み") }
+                }
+                (state.operation.state as? OperationState.Failed)?.let { failure ->
+                    Text(failure.message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
+                    TextButton(onClick = { vm.dismissOperationError(sessionId) }) { Text("エラーを閉じる") }
+                }
+                // Keep an existing screen/draft visible during read retry or failure.
+                key(sessionId) {
+                    when {
+                        snapshot == null && state.loading -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.semantics { contentDescription = "読み込み中" }) }
+                        snapshot == null -> Text("データを表示できません。再読み込みしてください。", modifier = Modifier.padding(16.dp))
+                        screen == "editor" -> {
+                            val savedId = ((state.operation.state as? OperationState.Committed)?.result as? OperationResult.TaskSaved)?.id
+                            if (savedId != null && snapshot.tasks.none { it.id == savedId }) Text("保存済み・データ表示待ち", modifier = Modifier.padding(16.dp))
+                            TaskEditorScreen(task, state) { title, recurrence -> vm.saveTask(selectedId, title, recurrence, sessionId) }
+                        }
+                        screen == "settings" -> SettingsScreen(snapshot.settings, snapshot.permissionRequested, notificationsEnabled, state, onEnableNotifications) { start, end, interval -> vm.saveSettings(start, end, interval, sessionId) }
+                        screen == "detail" && task != null -> TaskDetailScreen(task, !state.canSubmit, now, ZoneId.systemDefault(), { navigate("editor") }, { vm.completeTask(task.id, sessionId) }, { vm.setArchived(task.id, it, sessionId) })
+                        else -> TaskListScreen(snapshot.tasks, showArchived, { showArchived = it }, notificationsEnabled, snapshot.permissionRequested, onEnableNotifications, !state.canSubmit, now, ZoneId.systemDefault(), { navigate("detail", it) }, { vm.completeTask(it, sessionId) })
+                    }
                 }
             }
         }

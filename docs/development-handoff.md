@@ -1,0 +1,118 @@
+# Task Nudge 開発引き継ぎ
+
+この文書から再開する。完了済みの実装・設計・toolchain を最初からやり直さない。
+
+## 依頼と権限
+
+- ユーザーの依頼は、Android MVP の設計・実装・独立レビュー・PR 作成まで。subagent-driven-development 指定。
+- Repository: **private** `yutotamura55/task-nudge`。
+- Source Issue: https://github.com/yutotamura55/my-software-ideas/issues/11 （OPEN）。
+- Branch: `feat/11-task-reminders`。Base: `origin/main` の `7b401f0`。
+- **main へ push・merge・auto-merge・merge queue を行わない。マージはユーザーのみ。**
+- 合意した Issue 要件を全部満たせば PR に `Closes yutotamura55/my-software-ideas#11`。部分完了なら通常リンクと残作業を記す。
+- ユーザーの追加指示: 修正を繰り返してテストを通すだけではなく、設計の変更容易性・保守性を評価する。トークン制限後や他 AI への引き継ぎでも再開可能にする。
+
+## 再開場所
+
+同じ環境では `/home/y-tamura/workspace/task-nudge/.worktrees/mvp` を使う。親 checkout は `/home/y-tamura/workspace/task-nudge`。
+
+```bash
+git status --short
+git log -8 --oneline
+```
+
+未コミット変更は中断された実装である。消さず、最新の記録と比較して続行する。別環境では private repo を `gh repo clone` し、`feat/11-task-reminders` を checkout する。リポジトリ・workspace の AGENTS.md を最初に読む。
+
+詳細なローカル SDD 記録は `.superpowers/sdd/2026-09-30-task-nudge/`（gitignored）の `progress.md`、各 `*-report.md`、brief、review diff。この文書は別環境でも読める要約である。
+
+## 合意したアプリ
+
+タスク名だけで登録すると通知が出る。一日一回で十分。過去の未完了インスタンスは作らず、前回完了が古いタスクと、期限が来た保留タスクを優先する。通知は最大一件、完了・一時間保留。初期は09–21時・30分間隔。追加・編集・履歴・停止/再開・設定を日本語で提供する。Room/SQLite、Compose Material3、WorkManager、オフライン。通知権限を拒否しても管理画面は使える。バックアップ除外。
+
+仕様・計画:
+
+- `docs/superpowers/specs/2026-09-30-task-nudge-design.md`
+- `docs/superpowers/plans/2026-09-30-task-nudge.md`
+- **最新の境界再設計:** `docs/superpowers/specs/2026-10-01-command-boundaries.md`
+- **現在実行中:** `docs/superpowers/plans/2026-10-01-command-boundaries.md`
+
+## 完了済みの単位
+
+| 単位 | Commit | 検証・独立レビュー |
+|---|---|---|
+| 初期設計・計画 | `3c57634` | Spec/plan/AGENTS 保存済み |
+| Task1 build/pure policy | `d58ecf4` | core34件、lint/APKs成功。gpt-6.1-sol high: blocking findingなし |
+| Task2 Room/notification | `9ef767e` | core34/app34件、lint/APKs成功。gpt-6-astra high: blocking findingなし |
+| Task3 Japanese UI | `2eca5b9` + `2d617b2` | core34/app52件、lint0 errors/1kapt warning、両APK成功。保存連打/画面所有者の2指摘を修正し scoped review成功 |
+| 再設計文書 | `0832100` | 下記の architecture review に基づく |
+
+Task1–3 の実装・修正担当は **gpt-6.1-sol high**。architecture review は **gpt-6-astra high**。実装担当の自己レビューを独立レビューの代用にしない。
+
+## 現在の未完作業：保存境界の再設計
+
+独立設計レビューが3つの構造的問題を指摘した:
+
+1. 保存成功を snapshot の入力値一致で待つと、観測停止で全操作が止まるか、確定済み保存を再試行させる。
+2. global feedback flags と画面の所有者が混在し、設定保存や古いエラーが別画面へ届く。
+3. DB commit 後の通知処理/予約失敗を保存失敗として返すと、再試行が重複追加になる。
+
+決定は、コマンド確定・データ観測・画面所有者の境界を限定して再設計すること。通知の prepared/delivered recovery、mutex、Room は維持する。判断が不十分なら追加の境界修正が必要になる。
+
+中断時点の担当: `/root/command_boundaries`。usage limit で停止。再開時は生存状態を確認し、使える場合は followup する。別 agent に渡す場合は上記の一単位計画と現在差分を渡す。二重に実装 agent を走らせない。
+
+保存済み WIP:
+
+- Engine の commit 後 cancel/reconcile/schedule を回復可能な処理に分け、境界と例外クラスだけローカル記録。commit 前処理と mutex は維持。
+- **最後に確認した focused XML: ReminderEngineTest 28件 / failures0 / errors0。**
+- ViewModel は explicit session/operation state と retryable observation へ修正中。6件の RED を再現後、実装していた。**現在の全体ビルド・UI テスト成功は未確認。**
+- 変更中: TaskRepository、ReminderEngine、TaskViewModel、TaskUiState（新規）、TaskNudgeApp、TaskEditorScreen、SettingsScreen、engine/ViewModel tests。
+- 続きは UI 状態モデルを完成し、instrumentation tests の呼び出しも合わせ、下記 gate を実行。報告を先に保存し、commit後に独立した combined design/correctness review を行う。
+
+## 残る工程
+
+1. 上記境界修正の完成・検証・commit・独立レビュー。
+2. 元計画 **Task4**: scripts/check.sh、device-smoke.sh、GitHub Actions、実通知/Receiver/Room の instrumentation、画面回転/大文字/許可拒否の操作、実エミュレーター screenshots、Japanese README/testing guide。
+3. feature branch を push して CI を実行し、checks の範囲内の失敗を修正。Actions は enabled=true、allowed_actions=all を確認済み。
+4. 全差分を main base `7b401f0` と比較して独立レビュー。下記の確認済み非GPT CLIを優先。
+5. material findingsを修正・必要な再検証・scoped review後、`gh pr create`。PR URL、検証、reviewer/model/findings を報告。PRはまだ未作成。
+
+端末テストはまだ実行していない。従来の11 UI casesはcompile済みだったが、再設計後に再compileが必要。local KVMは使用不可なので API35 Google APIs x86_64 emulatorをCIで動かす。OEM/reboot/force-stopの実機確認は未実行と明記する。
+
+## Toolchain と実行
+
+`/tmp/task-nudge-toolchain` に JDK17、Gradle8.13、SDK36/build-tools35、license、cache を準備済み。再導入不要。同環境の runner:
+
+```bash
+/tmp/task-nudge-toolchain/run-gradle :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --max-workers=1
+```
+
+Gradle は network/socket sandbox のため approved prefix `/tmp/task-nudge-toolchain/run-gradle` で escalation を使う。**編集は通常権限の別コマンドで行う。編集scriptとescalated Gradleをまとめると承認待ちで停止した。** AGP lint FIR の内部エラーは `--max-workers=1` で回避できた。kapt推薦/processor-options警告は既知。
+
+別環境はJDK17/Android SDKとchecked-in wrapperを使う。SDK/cache/local.properties/keysはcommitしない。公式依存確認とchecksum証拠は `/tmp/task-nudge-dependencies.json`、`/tmp/task-nudge-toolchain/report.md`。
+
+## 最終 CLI レビュー（transport は検証済み）
+
+`agy` v1.2.12、実モデル **gemini-3.1-pro-high**。probe の init.model と SUCCESS を確認済み。`--mode plan --sandbox`、read-only、全文diffをstdinで渡す。`--disable-slash-commands` はplan modeを無効化するため付けない。
+
+NDJSON input は `{"event":"user","message":{"content":"requirements and full diff"}}`。`type:user` は誤り。
+
+```bash
+agy --model gemini-3.1-pro-high --mode plan --sandbox \
+  --input-format stream-json --output-format stream-json \
+  --print-timeout 240s --log-file /tmp/task-nudge-review/final.log \
+  --print '' < /tmp/task-nudge-review/final-request.jsonl \
+  > /tmp/task-nudge-review/final-output.jsonl
+```
+
+requestはPython json.dumps等で作り、requirementsとdiffを含める。実装の正当化は渡さない。tools/helpers/mutations禁止。result/actual modelを確認し、review前後にbranch/treeが変わっていないことを確認する。CLIが利用不可/完了不能なら理由を記録して別context subagentへfallbackする。
+
+## 記録しておく非blocking項目
+
+- routine evaluationが全履歴を取得する。件数増加時の集計queryは改善候補。paging/frameworkを先行追加しない。
+- nullable active generation fields、unused ActiveReminder、snooze/validation constantsの整理候補。
+- notification post/worker errorsの診断不足。今回の保存後処理にはログを入れている。
+- launcher iconとbackup rulesの旧minorは実装済み。kapt/toolchain warningは引き続き正確に報告する。
+
+## 別 AI に渡す開始指示
+
+> このrepoの `docs/development-handoff.md` と AGENTS.md を読み、`feat/11-task-reminders` の保存境界再設計の途中から続けてください。Task1–3 と toolchain はやり直さず、現在diffを維持してください。subagent-driven-developmentで、再設計の完成・独立レビュー・Task4 CI/device/docs・全体非GPTレビュー・PR作成まで進めてください。mainのpush/mergeはしないでください。

@@ -31,8 +31,8 @@ fun TaskEditorScreen(task: TaskSnapshot?, state: TaskUiState, onSave: (String, S
             Text("繰り返し：${recurrence}日ごと", style = MaterialTheme.typography.bodyMedium)
             state.recurrenceError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
-        Button(onClick = { onSave(title, recurrence) }, enabled = !state.saving, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-            Text(if (state.saving) "保存中…" else "保存")
+        Button(onClick = { onSave(title, recurrence) }, enabled = state.canSubmit, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+            Text(if (state.saving) "保存中…" else if (!state.canSubmit) "保存済み" else "保存")
         }
     }
 }
