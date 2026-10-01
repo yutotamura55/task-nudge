@@ -24,7 +24,9 @@
 - High: 端末テスト全件 pass と実画面画像が未提出。これは既知の未完了 gate と一致し、完了報告前に満たす必要がある。
 - Medium: テスト Application の親初期化を省く意図、プロセス終了後の font scale 復元、可変 Clock の withZone、調査用 semantics log。
 - Low: 無効 gateway の post assertion、fixture 差し替え時の通知 cleanup、action SHA の外部確認。action SHA は既に公式 upstream で確認済み。
-- 対応と変更後の再レビューは Task4 の仕上げ後に追記する。
+- 修正 `7f38921`: 親初期化を省く意図を明記、外側スクリプトで font scale を復元、withZone で可変時刻を共有、調査ログ除去、旧通知 cleanup、表示を確認してからの操作と画像退避・回収を修正。
+- 再レビュー: `9cf7924..7f38921` の追加全差分。実モデル `claude-sonnet-5`、exit 0、ファイル変更0。view ツールのみでテスト3ファイルと本体 Application を閲覧し、修正6点は妥当、残る重大な欠陥なしという結果。shell・編集・委任は実行なし。
+- 端末全件 pass・実画像配置・CI artifact 成功は、引き続き完了前に必要なエビデンス待ち。
 
 ## 実行環境の記録
 
