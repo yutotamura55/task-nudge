@@ -12,12 +12,39 @@ if [[ "$device_count" != 1 ]]; then
   exit 1
 fi
 
+original_font_scale="$("$adb_bin" shell settings get system font_scale | tr -d '\r')"
+restore_font_scale() {
+  local result=$?
+  trap - EXIT
+  if [[ "$original_font_scale" == "null" || -z "$original_font_scale" ]]; then
+    if ! "$adb_bin" shell settings delete system font_scale >/dev/null; then
+      echo "Unable to restore the original font scale" >&2
+      if [[ "$result" -eq 0 ]]; then result=1; fi
+    fi
+  else
+    if ! "$adb_bin" shell settings put system font_scale "$original_font_scale"; then
+      echo "Unable to restore the original font scale" >&2
+      if [[ "$result" -eq 0 ]]; then result=1; fi
+    fi
+  fi
+  exit "$result"
+}
+trap restore_font_scale EXIT
+"$adb_bin" shell settings put system font_scale 1.0
+
+for name in tasks history settings; do
+  "$adb_bin" shell rm -f "/sdcard/Pictures/TaskNudgeTest/$name.png"
+done
+
 test_status=0
 "$gradle_runner" --no-daemon --max-workers=1 :app:connectedDebugAndroidTest || test_status=$?
 
-screenshot_source="/sdcard/Android/data/dev.tasknudge/files/screenshots"
+screenshot_source="/sdcard/Pictures/TaskNudgeTest"
 screenshot_target="$repo_root/build/device-screenshots"
 mkdir -p "$screenshot_target"
+for name in tasks history settings; do
+  rm -f "$screenshot_target/$name.png"
+done
 if ! "$adb_bin" pull "$screenshot_source/." "$screenshot_target/"; then
   if [[ "$test_status" -eq 0 ]]; then
     echo "Unable to retrieve emulator screenshots from $screenshot_source" >&2

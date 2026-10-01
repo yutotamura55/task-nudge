@@ -23,13 +23,15 @@ class DeviceTestApplication : TaskNudgeApplication() {
         private set
     val fixedClock = MutableDeviceClock()
 
-    // The test application intentionally avoids the production startup scheduler.
+    // Do not call TaskNudgeApplication.onCreate(): it creates production WorkManager
+    // jobs before the isolated test container exists. Application.onCreate() is empty.
     // The receiver and Activity still use the same AppContainer and engine.
     override fun onCreate() {
         resetFixture()
     }
 
     fun resetFixture(notificationsEnabled: Boolean = true) {
+        if (database != null) container.notificationGateway.cancel()
         database?.close()
         fixedClock.instantValue = Instant.parse("2026-10-01T10:00:00Z")
         val db = Room.inMemoryDatabaseBuilder(this, TaskDatabase::class.java)
@@ -46,10 +48,16 @@ class DeviceTestApplication : TaskNudgeApplication() {
     }
 }
 
-class MutableDeviceClock(var instantValue: Instant = Instant.parse("2026-10-01T10:00:00Z")) : Clock() {
-    override fun getZone(): ZoneId = ZoneId.of("UTC")
-    override fun withZone(zone: ZoneId): Clock = Clock.fixed(instantValue, zone)
-    override fun instant(): Instant = instantValue
+class MutableDeviceClock private constructor(private val value: MutableInstant, private val zone: ZoneId) : Clock() {
+    constructor(initial: Instant = Instant.parse("2026-10-01T10:00:00Z")) : this(MutableInstant(initial), ZoneId.of("UTC"))
+    var instantValue: Instant
+        get() = value.instant
+        set(instant) { value.instant = instant }
+    override fun getZone(): ZoneId = zone
+    override fun withZone(zone: ZoneId): Clock = MutableDeviceClock(value, zone)
+    override fun instant(): Instant = value.instant
+
+    private class MutableInstant(var instant: Instant)
 }
 
 private object NoopDeviceScheduler : ReminderScheduler {
@@ -60,6 +68,7 @@ private object NoopDeviceScheduler : ReminderScheduler {
 private object DisabledDeviceGateway : NotificationGateway {
     override fun canNotify() = false
     override fun activeToken(): String? = null
+    // A post while disabled means the engine ignored canNotify(); fail the test.
     override fun post(taskId: Long, token: String, title: String): Nothing = error("Notifications are disabled in this fixture")
     override fun cancel() = Unit
 }
