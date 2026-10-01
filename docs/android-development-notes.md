@@ -1,6 +1,6 @@
-# Android アプリ開発で再利用する知見
+# Task Nudge の Android 開発記録
 
-Task Nudge の開発で、事前知識が必要だった点と、実行して初めて確認できた点を記録する。公式仕様・今回の観測・回避策を区別する。現在の検証結果は [testing.md](testing.md)、作業再開は [development-handoff.md](development-handoff.md) を参照。
+スマホアプリ全般・Android 全般の共有知見は workspace の `docs/mobile-app-development-notes.md` に整理した。この文書は Task Nudge での採用内容、障害の実例、検証証跡を残す。公式仕様・今回の観測・回避策を区別する。現在の検証結果は [testing.md](testing.md)、作業再開は [development-handoff.md](development-handoff.md) を参照。
 
 ## 次の開発で先に決めること
 
