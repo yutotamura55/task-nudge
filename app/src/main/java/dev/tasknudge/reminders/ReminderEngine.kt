@@ -1,5 +1,6 @@
 package dev.tasknudge.reminders
 
+import android.util.Log
 import androidx.room.withTransaction
 import dev.tasknudge.core.*
 import dev.tasknudge.data.*
@@ -40,10 +41,22 @@ class ReminderEngine(private val database: TaskDatabase, private val clock: Cloc
             }
             value
         }
-        if (cancelledToken != null && gateway.activeToken() == cancelledToken) gateway.cancel()
-        reconcileLocked()
-        scheduler.requestEvaluation()
+        // The transaction has committed. Maintenance cannot make retrying this
+        // command safe; periodic work and startup reconciliation can recover it.
+        maintainAfterCommit("cancel") {
+            if (cancelledToken != null && gateway.activeToken() == cancelledToken) gateway.cancel()
+        }
+        maintainAfterCommit("reconcile") { reconcileLocked() }
+        maintainAfterCommit("schedule") { scheduler.requestEvaluation() }
         result
+    }
+    private suspend fun maintainAfterCommit(operation: String, action: suspend () -> Unit) {
+        try { action() }
+        catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            // Exception messages may contain task text. Log only the boundary and type.
+            Log.w("ReminderEngine", "Post-commit $operation failed: ${failure.javaClass.simpleName}")
+        }
     }
     private suspend fun complete(id: Long) {
         val task = dao.task(id) ?: return

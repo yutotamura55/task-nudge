@@ -179,6 +179,50 @@ class ReminderEngineTest {
         zone = ZoneId.of("America/Los_Angeles"); repo.completeTask(id)
         assertEquals(setOf(LocalDate.parse("2026-10-01"), LocalDate.parse("2026-09-30")), repo.snapshots.first().tasks.single().completions.map { it.localDate }.toSet())
     }
+    @Test fun notificationReadFailureAfterCommitStillReturnsSavedIdAndSchedulesRecovery() = runTest {
+        gateway.failReadOnCall = 2 // Pre-commit reconciliation succeeds; follow-up fails.
+        val id = repo.saveTask(null, "private title")
+        assertEquals(id, repo.snapshots.first().tasks.single().id)
+        assertEquals(1, scheduler.requests)
+        gateway.failReadOnCall = null
+        engine.evaluate()
+        assertEquals(id, gateway.taskId)
+    }
+    @Test fun cancellationFailureAfterEditCommitDoesNotTurnItIntoRetryableSave() = runTest {
+        val id = repo.saveTask(null, "首"); engine.evaluate()
+        gateway.failCancel = true
+        val requests = scheduler.requests
+        assertEquals(id, repo.saveTask(id, "腕"))
+        assertEquals("腕", repo.snapshots.first().tasks.single().title)
+        assertEquals(requests + 1, scheduler.requests)
+        gateway.failCancel = false
+        engine.evaluate()
+        assertNull(gateway.visibleToken)
+        clock.advance(Duration.ofMinutes(30)); engine.evaluate()
+        assertEquals("腕", gateway.title)
+    }
+    @Test fun schedulerFailureAfterCommitReturnsIdAndLaterEvaluationRecovers() = runTest {
+        scheduler.failure = IllegalStateException("scheduler")
+        val id = repo.saveTask(null, "首")
+        assertEquals(id, repo.snapshots.first().tasks.single().id)
+        scheduler.failure = null
+        engine.evaluate()
+        assertEquals(id, gateway.taskId)
+        assertEquals(1, repo.snapshots.first().tasks.size)
+    }
+    @Test fun preCommitFailureDoesNotWriteAndStillFailsTheCommand() = runTest {
+        gateway.failReadOnCall = 1
+        try { repo.saveTask(null, "首"); fail("Expected command failure") }
+        catch (_: IllegalStateException) { }
+        assertTrue(repo.snapshots.first().tasks.isEmpty())
+        assertEquals(0, scheduler.requests)
+    }
+    @Test fun cancellationAfterCommitIsPropagatedInsteadOfReportedAsSaveFailure() = runTest {
+        scheduler.failure = CancellationException("cancelled")
+        try { repo.saveTask(null, "首"); fail("Expected cancellation") }
+        catch (_: CancellationException) { }
+        assertEquals(1, repo.snapshots.first().tasks.size)
+    }
     private suspend fun reserve(id: Long, token: String, delivered: Boolean) {
         db.dao().saveState(ReminderStateEntity(activeTaskId = id, activeToken = token, activeLocalDate = "2026-10-01", preparedAt = clock.millis(), deliveredAt = if (delivered) clock.millis() else null, lastNotifiedAt = if (delivered) clock.millis() else null))
     }
@@ -198,13 +242,22 @@ private class FakeGateway : NotificationGateway {
     var title: String? = null
     var failure: RuntimeException? = null
     override fun canNotify() = allowed
-    override fun activeToken() = visibleToken
+    var failReadOnCall: Int? = null
+    var reads = 0
+    var failCancel = false
+    override fun activeToken(): String? {
+        reads++
+        if (reads == failReadOnCall) error("notification read")
+        return visibleToken
+    }
     override fun post(taskId: Long, token: String, title: String) {
         failure?.let { throw it }; posts++; visibleToken = token; this.taskId = taskId; this.title = title
     }
-    override fun cancel() { cancels++; visibleToken = null }
+    override fun cancel() { if (failCancel) error("cancel"); cancels++; visibleToken = null }
 }
 private class FakeScheduler : ReminderScheduler {
+    var requests = 0
+    var failure: RuntimeException? = null
     override fun ensurePeriodicWork() = Unit
-    override fun requestEvaluation(delay: Duration) = Unit
+    override fun requestEvaluation(delay: Duration) { requests++; failure?.let { throw it } }
 }
