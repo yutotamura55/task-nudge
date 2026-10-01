@@ -168,16 +168,14 @@ class TaskScreensTest {
         compose.onNodeWithText("終了（時）").performTextReplacement("24")
         assertEquals("24", compose.onNodeWithText("開始（時）").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         assertEquals("24", compose.onNodeWithText("終了（時）").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
-        compose.onNodeWithText("保存").assertIsEnabled()
-        compose.onNodeWithText("保存").performClick()
+        compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
         val message = "開始は0〜23時、終了は1〜24時の整数で、開始より後に設定してください。間隔は30・60・120分です。"
-        compose.onRoot(useUnmergedTree = true).printToLog("TaskSettingsInvalid")
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("settingsError", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(message, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         assertEquals(ReminderSettings(), repo.data.value.settings)
         compose.onNodeWithText("開始（時）").performTextReplacement("0")
         compose.onNodeWithText("120分").performClick()
-        compose.onNodeWithText("保存").performClick()
+        compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick()
         compose.waitUntil { repo.data.value.settings == ReminderSettings(0, 24, 120) }
     }
     @Test fun editDraftSurvivesStateRestoration() {

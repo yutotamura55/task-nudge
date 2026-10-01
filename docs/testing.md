@@ -25,4 +25,4 @@ GitHub Actions は pull request と feature/main branch push でホスト検証�
 
 OEM の省電力制御、再起動、強制停止後の挙動は API 35 エミュレーターだけでは確認できません。実機での確認結果がない場合は、検証済みと記載しません。
 
-開発環境、通知権限、データ境界、端末テストで今回得た知見は [Android 開発ノート](android-development-notes.md) にまとめています。
+開発環境、通知権限、データ境界、端末テストで今回確認した事実は [Android 開発記録](android-development-notes.md) にまとめています。

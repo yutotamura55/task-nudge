@@ -37,12 +37,13 @@ class ScreenshotTest {
 
     @Test fun titleOnlyAddDetailAndManualCompletionWorkInActivity() {
         ActivityScenario.launch(MainActivity::class.java).use {
+            compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("タスクを追加").fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithContentDescription("タスクを追加").performClick()
             compose.onNodeWithText("タイトル").performTextInput("首のストレッチ")
-            compose.onNodeWithText("保存").performClick()
-            compose.onNodeWithText("実行履歴（0回）").performScrollTo().assertIsDisplayed()
-            compose.onNodeWithText("完了").performClick()
-            compose.onNodeWithText("実行履歴（1回）").performScrollTo().assertIsDisplayed()
+            saveVisibleEditor()
+            scrollToVisibleText("実行履歴（0回）")
+            compose.onNode(hasText("完了") and hasClickAction()).performScrollTo().assertIsDisplayed().performClick()
+            scrollToVisibleText("実行履歴（1回）")
             compose.onNodeWithText("今日完了済み").assertIsNotEnabled()
             runBlocking { assertEquals(1, app.container.repository.snapshots.first().tasks.single().completions.size) }
         }
@@ -74,9 +75,8 @@ class ScreenshotTest {
                 }
                 compose.onNodeWithContentDescription("タスクを追加").performClick()
                 compose.onNodeWithText("タイトル").performTextInput("大きな文字でも追加")
-                compose.onNodeWithText("保存").assertIsDisplayed()
-                compose.onNodeWithText("保存").performClick()
-                compose.onNodeWithText("実行履歴（0回）").assertIsDisplayed()
+                saveVisibleEditor()
+                scrollToVisibleText("実行履歴（0回）")
             }
         } finally { shell("settings put system font_scale 1.0") }
     }
@@ -84,13 +84,13 @@ class ScreenshotTest {
     @Test fun deniedNotificationPermissionStillAllowsManualTracking() {
         app.resetFixture(notificationsEnabled = false)
         ActivityScenario.launch(MainActivity::class.java).use {
-            compose.onNodeWithText("通知が無効です").assertIsDisplayed()
+            scrollToVisibleText("通知が無効です")
             compose.onNodeWithContentDescription("タスクを追加").performClick()
             compose.onNodeWithText("タイトル").performTextInput("通知なしでも記録")
-            compose.onNodeWithText("保存").performClick()
-            compose.onNodeWithText("実行履歴（0回）").performScrollTo().assertIsDisplayed()
-            compose.onNodeWithText("完了").performClick()
-            compose.onNodeWithText("実行履歴（1回）").performScrollTo().assertIsDisplayed()
+            saveVisibleEditor()
+            scrollToVisibleText("実行履歴（0回）")
+            compose.onNode(hasText("完了") and hasClickAction()).performScrollTo().assertIsDisplayed().performClick()
+            scrollToVisibleText("実行履歴（1回）")
         }
     }
 
@@ -127,11 +127,14 @@ class ScreenshotTest {
             notification.notification.contentIntent.send()
             activity = instrumentation.waitForMonitorWithTimeout(monitor, 10_000) as? MainActivity
             assertNotNull("Notification tap should launch MainActivity", activity)
-            compose.onNodeWithText("実行履歴（0回）").performScrollTo().assertIsDisplayed()
+            compose.waitUntil(10_000) { compose.onAllNodesWithText("タスクの詳細").fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithText("タスクの詳細").assertIsDisplayed()
+            scrollToVisibleText("実行履歴（0回）")
             compose.onNodeWithContentDescription("戻る").performClick()
             compose.onNodeWithContentDescription("タスクを追加").assertIsDisplayed()
             notification.notification.contentIntent.send()
-            compose.onNodeWithText("実行履歴（0回）").performScrollTo().assertIsDisplayed()
+            compose.waitUntil(10_000) { compose.onAllNodesWithText("タスクの詳細").fetchSemanticsNodes().isNotEmpty() }
+            scrollToVisibleText("実行履歴（0回）")
             assertEquals(taskId, notification.notification.extras.getLong("taskId"))
         } finally {
             activity?.runOnUiThread { activity?.finish() }
@@ -144,11 +147,21 @@ class ScreenshotTest {
         val screenshot = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
         val directory = requireNotNull(app.getExternalFilesDir("screenshots"))
         directory.mkdirs()
-        File(directory, "$name.png").outputStream().use { assertTrue(screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)) }
+        val file = File(directory, "$name.png")
+        file.outputStream().use { assertTrue(screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)) }
         screenshot.recycle()
+        val sharedFile = "/sdcard/Pictures/TaskNudgeTest/$name.png"
+        assertEquals("copied", shell("mkdir -p /sdcard/Pictures/TaskNudgeTest && cp ${file.absolutePath} $sharedFile && test -s $sharedFile && echo copied").trim())
     }
 
-    private fun shell(command: String) {
-        android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes() }
+    private fun saveVisibleEditor() { compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick() }
+
+    private fun scrollToVisibleText(value: String) {
+        compose.waitUntil(10_000) { compose.onAllNodes(hasScrollAction()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText(value))
+        compose.onNodeWithText(value).assertIsDisplayed()
     }
+
+    private fun shell(command: String): String =
+        android.os.ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use { it.readBytes().toString(Charsets.UTF_8) }
 }
