@@ -3,6 +3,7 @@ package dev.tasknudge.ui
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.semantics.SemanticsActions
 import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.data.*
 import kotlinx.coroutines.CompletableDeferred
@@ -69,6 +70,57 @@ class TaskScreensTest {
         compose.onNodeWithText("腰の下書き").assertIsDisplayed()
         compose.onNodeWithText("保存").assertIsEnabled()
         assertEquals("首", repo.data.value.tasks.single().title)
+    }
+    @Test fun oldEditorSaveCallbackCannotWriteTheNewlySelectedTask() {
+        val repo = ScreenRepository(listOf(sampleTask(), sampleTask().copy(id = 2, title = "腰")))
+        launch(repo, initial = 1)
+        compose.onNodeWithText("編集").performClick()
+        compose.onNodeWithText("タイトル").performTextReplacement("首の下書き")
+        val oldSave = compose.onNodeWithText("保存").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        compose.onNodeWithContentDescription("戻る").performClick()
+        compose.onNodeWithContentDescription("戻る").performClick()
+        compose.onNodeWithText("腰").performClick()
+        compose.onNodeWithText("編集").performClick()
+        compose.onNodeWithText("タイトル").performTextReplacement("腰の下書き")
+        compose.runOnIdle { oldSave() }
+        compose.onNodeWithText("腰の下書き").assertIsDisplayed()
+        compose.onNodeWithText("保存").assertIsEnabled()
+        compose.runOnIdle {
+            assertEquals(0, repo.saveCalls)
+            assertEquals("腰", repo.data.value.tasks.single { it.id == 2L }.title)
+        }
+    }
+    @Test fun oldSettingsSaveCallbackCannotClaimNewEditorSession() {
+        val repo = ScreenRepository(); launch(repo)
+        compose.onNodeWithContentDescription("通知設定").performClick()
+        compose.onNodeWithText("開始（時）").performTextReplacement("0")
+        val oldSave = compose.onNodeWithText("保存").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        compose.onNodeWithContentDescription("戻る").performClick()
+        compose.onNodeWithContentDescription("タスクを追加").performClick()
+        compose.onNodeWithText("タイトル").performTextInput("新しい下書き")
+        compose.runOnIdle { oldSave() }
+        compose.onNodeWithText("新しい下書き").assertIsDisplayed()
+        compose.onNodeWithText("保存").assertIsEnabled()
+        compose.runOnIdle { assertEquals(ReminderSettings(), repo.data.value.settings) }
+    }
+    @Test fun oldDetailCompleteCallbackCannotRunInAnotherScreenSession() {
+        val repo = ScreenRepository(listOf(sampleTask(), sampleTask().copy(id = 2, title = "腰")))
+        launch(repo, initial = 1)
+        val oldComplete = compose.onNodeWithText("完了").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        compose.onNodeWithContentDescription("戻る").performClick()
+        compose.onNodeWithText("腰").performClick()
+        compose.runOnIdle { oldComplete() }
+        compose.onNodeWithText("完了").assertIsEnabled()
+        compose.runOnIdle { assertEquals(1, repo.data.value.tasks.single { it.id == 1L }.completions.size) }
+    }
+    @Test fun oldListCompleteCallbackCannotRunAfterOpeningSettings() {
+        val repo = ScreenRepository(listOf(sampleTask())); launch(repo)
+        val oldComplete = compose.onNodeWithText("完了").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
+        compose.onNodeWithContentDescription("通知設定").performClick()
+        compose.runOnIdle { oldComplete() }
+        compose.onNodeWithText("開始（時）").assertIsDisplayed()
+        compose.onNodeWithText("保存").assertIsEnabled()
+        compose.runOnIdle { assertEquals(1, repo.data.value.tasks.single().completions.size) }
     }
     @Test fun inputErrorsRemainInlineAndDoNotSave() {
         val repo = ScreenRepository(); launch(repo)
