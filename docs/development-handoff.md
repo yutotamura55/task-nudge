@@ -48,7 +48,7 @@ git log -8 --oneline
 
 Task1–3 の実装・修正担当は **gpt-6.1-sol high**。architecture review は **gpt-6-astra high**。実装担当の自己レビューを独立レビューの代用にしない。
 
-## 保存境界の再設計：独立レビューの callback 所有者指摘を修正中
+## 保存境界の再設計：完了
 
 独立設計レビューが3つの構造的問題を指摘した:
 
@@ -64,15 +64,21 @@ Task1–3 の実装・修正担当は **gpt-6.1-sol high**。architecture review
 - TaskViewModel の session/operation state と再試行可能な観測を確認。ViewModel 24件・ReminderEngine 28件を含む app 67件、core 34件が成功した。
 - instrumented UI の旧「保存中」期待を「保存済み・データ表示待ち」へ修正。保存結果を表示する前に戻れる結果も追加し、AndroidTest APK まで compile/assemble 成功。**端末上での実行は Task 4。**
 - 指定 gate `:core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --max-workers=1` は exit 0。lint 0 errors / 既知の kapt warning 1件。
-- ローカル記録 `.superpowers/sdd/2026-09-30-task-nudge/command-boundaries-report.md` に状態遷移と検証を保存。独立した combined correctness/design review は、旧画面 callback が実行時の新 session/task ID を読む Important 指摘を出した。各 screen callback に生成時の owner/task ID を束縛し、旧 action を保持して新 draft で呼ぶ 4 件の instrumented regression を追加。**修正差分の scoped re-review は controller が次に実行する。**
+- ローカル記録 `.superpowers/sdd/2026-09-30-task-nudge/command-boundaries-report.md` に状態遷移と検証を保存。独立した combined correctness/design review は、旧画面 callback が実行時の新 session/task ID を読む Important 指摘を出した。各 screen callback に生成時の owner/task ID を束縛し、旧 action を保持して新 draft で呼ぶ 4 件の instrumented regression を追加。修正差分の scoped re-review は全指摘解消で完了し、commit `910a682` まで保存済み。
+
+## Task 4 実行中（CI checkpoint）
+
+- 担当: `/root/task4_implementation`。作業場所はこの worktree。開始点 `910a682`。元 Task4 brief は `.superpowers/sdd/2026-09-30-task-nudge/task-4-brief.md`、進捗は同ディレクトリの `task-4-report.md`。
+- 追加済み: 実 Room + Android 通知 + Receiver の instrumented tests、実 Activity/Compose の操作・通知タップ・回転・文字拡大・権限拒否・スクリーンショット tests、`scripts/check.sh` / `scripts/device-smoke.sh`、SHA 固定の GitHub Actions workflow。
+- ホスト gate は provisioned runner で `:core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --max-workers=1` が exit 0。**端末実行は未確認**。次は feature branch push 後の API35 CI emulator 結果を調べ、失敗を修正する。
+- README / `docs/testing.md` / 実スクリーンショットはこの checkpoint の後に追加する。CI の実画像を確認する前にスクリーンショット完成を主張しない。
 
 ## 残る工程
 
-1. 上記境界修正の callback 所有者 fix の scoped re-review。新たな重要指摘は修正・再検証する。
-2. 元計画 **Task4**: scripts/check.sh、device-smoke.sh、GitHub Actions、実通知/Receiver/Room の instrumentation、画面回転/大文字/許可拒否の操作、実エミュレーター screenshots、Japanese README/testing guide。
-3. feature branch を push して CI を実行し、checks の範囲内の失敗を修正。Actions は enabled=true、allowed_actions=all を確認済み。
-4. 全差分を main base `7b401f0` と比較して独立レビュー。下記の確認済み非GPT CLIを優先。
-5. material findingsを修正・必要な再検証・scoped review後、`gh pr create`。PR URL、検証、reviewer/model/findings を報告。PRはまだ未作成。
+1. Task4 の CI emulator 実行結果を確認して失敗を修正し、実スクリーンショットを検証・保存する。
+2. README と `docs/testing.md` を完成し、host/device gate を確証する。
+3. 全差分を main base `7b401f0` と比較して独立レビュー。下記の確認済み非GPT CLIを優先。
+4. material findingsを修正・必要な再検証・scoped review後、`gh pr create`。PR URL、検証、reviewer/model/findings を報告。PRはまだ未作成。
 
 端末テストはまだ実行していない。再設計後の16 UI casesはcompile済み。local KVMは使用不可なので API35 Google APIs x86_64 emulatorをCIで動かす。OEM/reboot/force-stopの実機確認は未実行と明記する。
 
