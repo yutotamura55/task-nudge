@@ -48,7 +48,7 @@ git log -8 --oneline
 
 Task1–3 の実装・修正担当は **gpt-6.1-sol high**。architecture review は **gpt-6-astra high**。実装担当の自己レビューを独立レビューの代用にしない。
 
-## 現在の未完作業：保存境界の再設計
+## 保存境界の再設計：実装とローカル検証済み、独立レビュー待ち
 
 独立設計レビューが3つの構造的問題を指摘した:
 
@@ -58,25 +58,23 @@ Task1–3 の実装・修正担当は **gpt-6.1-sol high**。architecture review
 
 決定は、コマンド確定・データ観測・画面所有者の境界を限定して再設計すること。通知の prepared/delivered recovery、mutex、Room は維持する。判断が不十分なら追加の境界修正が必要になる。
 
-中断時点の担当: `/root/command_boundaries`。usage limit で停止。再開時は生存状態を確認し、使える場合は followup する。別 agent に渡す場合は上記の一単位計画と現在差分を渡す。二重に実装 agent を走らせない。
-
-保存済み WIP:
+実装担当は `/root/command_boundaries_resume`。保存された WIP `b913463` から再開し、次を確認・修正した:
 
 - Engine の commit 後 cancel/reconcile/schedule を回復可能な処理に分け、境界と例外クラスだけローカル記録。commit 前処理と mutex は維持。
-- **最後に確認した focused XML: ReminderEngineTest 28件 / failures0 / errors0。**
-- ViewModel は explicit session/operation state と retryable observation へ修正中。6件の RED を再現後、実装していた。**現在の全体ビルド・UI テスト成功は未確認。**
-- 変更中: TaskRepository、ReminderEngine、TaskViewModel、TaskUiState（新規）、TaskNudgeApp、TaskEditorScreen、SettingsScreen、engine/ViewModel tests。
-- 続きは UI 状態モデルを完成し、instrumentation tests の呼び出しも合わせ、下記 gate を実行。報告を先に保存し、commit後に独立した combined design/correctness review を行う。
+- TaskViewModel の session/operation state と再試行可能な観測を確認。ViewModel 24件・ReminderEngine 28件を含む app 67件、core 34件が成功した。
+- instrumented UI の旧「保存中」期待を「保存済み・データ表示待ち」へ修正。保存結果を表示する前に戻れる結果も追加し、AndroidTest APK まで compile/assemble 成功。**端末上での実行は Task 4。**
+- 指定 gate `:core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --max-workers=1` は exit 0。lint 0 errors / 既知の kapt warning 1件。
+- ローカル記録 `.superpowers/sdd/2026-09-30-task-nudge/command-boundaries-report.md` に状態遷移と検証を保存。**独立した combined correctness/design review は controller が次に実行する。**
 
 ## 残る工程
 
-1. 上記境界修正の完成・検証・commit・独立レビュー。
+1. 上記境界修正の独立した combined correctness/design review。重要な指摘は修正・再検証・scoped review。
 2. 元計画 **Task4**: scripts/check.sh、device-smoke.sh、GitHub Actions、実通知/Receiver/Room の instrumentation、画面回転/大文字/許可拒否の操作、実エミュレーター screenshots、Japanese README/testing guide。
 3. feature branch を push して CI を実行し、checks の範囲内の失敗を修正。Actions は enabled=true、allowed_actions=all を確認済み。
 4. 全差分を main base `7b401f0` と比較して独立レビュー。下記の確認済み非GPT CLIを優先。
 5. material findingsを修正・必要な再検証・scoped review後、`gh pr create`。PR URL、検証、reviewer/model/findings を報告。PRはまだ未作成。
 
-端末テストはまだ実行していない。従来の11 UI casesはcompile済みだったが、再設計後に再compileが必要。local KVMは使用不可なので API35 Google APIs x86_64 emulatorをCIで動かす。OEM/reboot/force-stopの実機確認は未実行と明記する。
+端末テストはまだ実行していない。再設計後の12 UI casesはcompile済み。local KVMは使用不可なので API35 Google APIs x86_64 emulatorをCIで動かす。OEM/reboot/force-stopの実機確認は未実行と明記する。
 
 ## Toolchain と実行
 

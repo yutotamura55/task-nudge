@@ -28,17 +28,31 @@ class TaskScreensTest {
         assertEquals(1, repo.data.value.tasks.single().recurrenceDays)
         compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
     }
-    @Test fun saveWaitsForPersistedSnapshotBeforeOpeningNewDetail() {
+    @Test fun committedAddWaitsForDisplayDataWithoutOfferingDuplicateSave() {
         val repo = ScreenRepository(publishSaves = false); launch(repo)
         compose.onNodeWithContentDescription("タスクを追加").performClick()
         compose.onNodeWithText("タイトル").performTextInput("首のストレッチ")
         compose.onNodeWithText("保存").performClick()
         compose.waitUntil { repo.pendingTask != null }
+        compose.onNodeWithText("保存済み・データ表示待ち").assertIsDisplayed()
         compose.onNodeWithText("タイトル").assertIsDisplayed()
-        compose.onNodeWithText("保存中…").assertIsNotEnabled().performClick()
+        compose.onNodeWithText("保存済み").assertIsNotEnabled()
         compose.runOnIdle { assertEquals(1, repo.saveCalls) }
         compose.runOnIdle { repo.data.value = repo.data.value.copy(tasks = listOf(repo.pendingTask!!)) }
         compose.onNodeWithText("実行履歴（0回）").assertIsDisplayed()
+    }
+    @Test fun committedAddCanLeaveWhileDisplayDataIsDelayed() {
+        val repo = ScreenRepository(publishSaves = false); launch(repo)
+        compose.onNodeWithContentDescription("タスクを追加").performClick()
+        compose.onNodeWithText("タイトル").performTextInput("首")
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil { repo.pendingTask != null }
+        compose.onNodeWithText("保存済み・データ表示待ち").assertIsDisplayed()
+        compose.onNodeWithContentDescription("戻る").performClick()
+        compose.onNodeWithContentDescription("タスクを追加").assertIsDisplayed()
+        compose.runOnIdle { repo.data.value = repo.data.value.copy(tasks = listOf(repo.pendingTask!!)) }
+        compose.onNodeWithContentDescription("タスクを追加").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(1, repo.saveCalls) }
     }
     @Test fun suspendedSaveCannotDiscardAnotherEditorDraft() {
         val repo = ScreenRepository().apply { gate = CompletableDeferred() }; launch(repo)
