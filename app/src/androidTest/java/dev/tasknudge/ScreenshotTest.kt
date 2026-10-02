@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Build
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
@@ -43,6 +44,7 @@ class ScreenshotTest {
             scrollToVisibleText("実行履歴（0回）")
             compose.onNode(hasText("完了") and hasClickAction()).performScrollTo().assertIsDisplayed().performClick()
             scrollToVisibleText("実行履歴（1回）")
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText("今日完了済み"))
             compose.onNodeWithText("今日完了済み").assertIsNotEnabled()
             runBlocking { assertEquals(1, app.container.repository.snapshots.first().tasks.single().completions.size) }
         }
@@ -106,6 +108,7 @@ class ScreenshotTest {
             compose.onNodeWithText("首のストレッチ").performClick()
             compose.onNode(hasScrollAction()).performScrollToNode(hasText("実行履歴（1回）"))
             compose.onNodeWithText("実行履歴（1回）").assertIsDisplayed()
+            compose.onNodeWithText("タスクの詳細").assertIsDisplayed()
             capture("history")
             compose.onNodeWithContentDescription("戻る").performClick()
             compose.onNodeWithContentDescription("通知設定").performClick()
@@ -143,7 +146,9 @@ class ScreenshotTest {
 
     private fun capture(name: String) {
         compose.waitForIdle()
-        val screenshot = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+        // captureToImage waits for this Compose surface to finish drawing; the
+        // device-wide screenshot API can return the previous screen's frame.
+        val screenshot = compose.onRoot().captureToImage().asAndroidBitmap()
         val directory = requireNotNull(app.getExternalFilesDir("screenshots"))
         directory.mkdirs()
         val file = File(directory, "$name.png")
