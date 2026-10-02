@@ -13,7 +13,9 @@
 
 ## インストール
 
-対応は **Android 8.0（API 26）以上**です。GitHub Actions の成功した `Android` 実行から `task-nudge-debug` artifact をダウンロードし、ZIP 内の `app-debug.apk` を端末へ転送して開きます。開発用 APK なので、端末で「この提供元からのインストール」を許可する必要があります。USB デバッグを使う場合は `adb install -r app-debug.apk` でも入れられます。APK は署名済みストア配布版ではありません。
+対応は **Android 8.0（API 26）以上**です。GitHub Actions の成功した `Android` 実行から `task-nudge-debug` artifact をダウンロードし、ZIP 内の `app-debug.apk` を端末へ転送して開きます。開発用 APK なので、端末で「この提供元からのインストール」を許可する必要があります。APK はストア配布版ではありません。
+
+CI の debug APK は署名を実行間で固定管理していません。同じ署名なら `adb install -r app-debug.apk` で上書きできますが、別の実行で作った APK が上書きできる保証はありません。署名が異なる場合はアンインストールが必要で、端末内の記録も失われます。
 
 Android 13 以上では、明示的に「通知を有効にする」を押したときだけ通知権限を求めます。拒否後は端末のアプリ通知設定から変更できます。Android 8〜12 でも端末全体または通知チャンネルを無効にすると通知されません。
 
@@ -29,4 +31,4 @@ Android 13 以上では、明示的に「通知を有効にする」を押した
 
 ## 開発と検証
 
-JDK 17、Android SDK 36、Gradle 8.13（同梱 wrapper）、AGP 8.13.2、Kotlin 2.2.21 を使います。`scripts/check.sh` は core/app 単体テスト、lint、debug APK と instrumentation APK のビルドを実行します。Android 端末またはエミュレーターを 1 台接続して `scripts/device-smoke.sh` を実行すると、Compose と実通知の instrumentation テストを実行します。手順と端末上の確認項目は [docs/testing.md](docs/testing.md)、今回の開発記録は [docs/android-development-notes.md](docs/android-development-notes.md) を参照してください。
+JDK 17、Android SDK 36、Gradle 8.13（同梱 wrapper）、AGP 8.13.2、Kotlin 2.2.21 を使います。`scripts/check.sh` は core/app 単体テスト、lint、debug APK と instrumentation APK のビルドを実行します。**専用テスト端末またはエミュレーター**を 1 台接続して `scripts/device-smoke.sh` を実行すると、Compose と実通知の instrumentation テストを実行します。端末テスト後はアプリがアンインストールされるため、普段の記録がある端末では実行しないでください。手順と端末上の確認項目は [docs/testing.md](docs/testing.md)、今回の開発記録は [docs/android-development-notes.md](docs/android-development-notes.md) を参照してください。

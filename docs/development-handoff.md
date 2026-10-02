@@ -124,7 +124,7 @@ requestはPython json.dumps等で作り、requirementsとdiffを含める。実�
 
 ## 別 AI に渡す開始指示
 
-> このrepoの `docs/development-handoff.md` と AGENTS.md を読み、`feat/11-task-reminders` の保存境界再設計の途中から続けてください。Task1–3 と toolchain はやり直さず、現在diffを維持してください。subagent-driven-developmentで、再設計の完成・独立レビュー・Task4 CI/device/docs・全体非GPTレビュー・PR作成まで進めてください。mainのpush/mergeはしないでください。
+> この repo の `AGENTS.md`、`docs/development-handoff.md`、`docs/review-record.md` を読み、`feat/11-task-reminders` の Task 4 最終検証から続けてください。Task 1–3、保存境界再設計、全体レビューと追加差分レビューは完了済みなのでやり直さないでください。CI run `36948348370` の API 35 端末結果を確認し、全 23 件成功と実画像 3 枚を確認した後、画像・日本語文書を commit/push してください。親担当が PR 作成と PR checks を追跡します。main へ push/merge はしないでください。
 
 ## 2026-10-02 再開 checkpoint
 
@@ -134,3 +134,4 @@ requestはPython json.dumps等で作り、requirementsとdiffを含める。実�
 - Copilot CLI の確認済み `claude-sonnet-5` に2つのandroidTestファイルだけ修正委任中。shell禁止、view/editのみ。親がビルド・CI・commit・独立再レビュー・PRを行う。CLIログ `/tmp/task-nudge-review/copilot-fix-output.jsonl`。
 - Gemini 全体レビューと Copilot scoped再レビューは既に完了し、対応後material defectなし。再実行せず、新たな修正差分だけ独立に確認する。
 - 新規共有 skill の手順に合わせ開発先Issue #1 を作成。元アイデアIssueは自動closeせず、PRのclosingは開発先 #1 に対して評価する。
+- CI [36948348370](https://github.com/yutotamura55/task-nudge/actions/runs/36948348370) は host101/101、device23件中22件成功、1件失敗。残りは詳細履歴までスクロール後に画面外となった「今日完了済み」を探すテスト操作。画像3枚は回収されたが、原寸確認で history.png が詳細でなく直前の一覧フレームを写していたため掲載しない。完了ボタンを LazyColumn で再表示してから無効状態を確認し、画像は Compose `captureToImage()` で描画完了した画面を取得する修正を加えた。次 run で23/23と3画像の内容を再確認する。
