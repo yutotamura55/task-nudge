@@ -172,7 +172,15 @@ class ScreenshotTest {
         )
     }
 
-    private fun saveVisibleEditor() { compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick() }
+    private fun saveVisibleEditor() {
+        compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick()
+        // Save commits asynchronously; the app navigates to the detail screen only once
+        // the committed TaskSaved result is observed in a snapshot. Wait for that
+        // screen-owned transition (its title) before any history scroll, otherwise a
+        // scroll can still target the stale editor's own scrollable container.
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("タスクの詳細").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("タスクの詳細").assertIsDisplayed()
+    }
 
     private fun clickAddFab() { waitForAddFabVisible(); compose.onNodeWithContentDescription("タスクを追加").performClick() }
 

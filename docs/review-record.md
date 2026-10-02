@@ -66,3 +66,13 @@ Clock/zone の所有者を AppContainer にそろえ、UI と engine へ同じ�
 - 当該4ファイル差分の独立レビュー: Copilot CLI、実モデル `claude-sonnet-5`、exit0、編集0、viewのみ。要件・全差分・現在の4ファイルを提示し、下流の一覧/詳細/engineも閲覧。blocking defectなし、以前の動作に対する退行なし。
 - zoneの再取得やpublic valは軽微なスタイル提案。zoneをrememberで固定すると実OSのtimezone変更を追従できなくなるため採用しない。既存依存を直接共有し、追加accessorは作らない。
 - 既存CIの失敗が実際の挙動red証拠。追加した回帰テストは未定義パラメータでcompile redを確認し、修正後のfull host gateはexit0。端末では回帰1件を加えた24件を次runで検証する。
+
+## PR の非同期画面遷移を待つ修正
+
+`beef056` の push CI `36952478562` はホスト成功・端末24/24成功。同じcommitの PR CI `36952524280` は文字拡大テスト1件が失敗。失敗XMLでは詳細の LazyColumn が持つ ScrollToIndex がなく、editor側の ScrollBy と5子要素が残っていた。保存クリックからDB確定・snapshot観測・画面遷移までの非同期処理に対し、テストが古い画面を探索していた。
+
+- 修正担当: Copilot CLI、確認済み実モデル `claude-sonnet-5`、exit0。view/editのみ、ScreenshotTest1ファイルに限定。本体変更・shell・委任なし。
+- 保存をクリックした後、遷移先「タスクの詳細」の表示をbounded waitで確認する。既存assertionを維持し、固定sleep・catch・テスト削除なし。
+- 独立reviewer: Gemini (`agy`)、実モデル `gemini-3.1-pro-high`、SUCCESS。要件と全差分・現在のテスト/画面コードを提示、ツール実行・編集・委任なし。重大な問題・退行の指摘なし。将来の同名タイトルとAPI簡略化は非blocking提案で、現在のテスト入力には該当しない。
+- ローカル `scripts/check.sh` exit0（94tasks、8executed、86up-to-date）。端末ではPR再実行で確認する。
+- 成功したpush runの画像3枚を親が原寸確認。今日の完了1/2、詳細の今日完了済み、履歴1件、設定を確認し、README画像を更新した。
