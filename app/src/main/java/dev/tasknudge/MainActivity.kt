@@ -61,7 +61,7 @@ class MainActivity : ComponentActivity() {
                                 } finally { enabling = false }
                             }
                         }
-                    }, initialTaskId)
+                    }, initialTaskId, clock = container.clock, zoneProvider = container.zoneProvider)
                 }
             }
         }

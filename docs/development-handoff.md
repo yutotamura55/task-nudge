@@ -66,26 +66,22 @@ Task1–3 の実装・修正担当は **gpt-6.1-sol high**。architecture review
 - 指定 gate `:core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --max-workers=1` は exit 0。lint 0 errors / 既知の kapt warning 1件。
 - ローカル記録 `.superpowers/sdd/2026-09-30-task-nudge/command-boundaries-report.md` に状態遷移と検証を保存。独立した combined correctness/design review は、旧画面 callback が実行時の新 session/task ID を読む Important 指摘を出した。各 screen callback に生成時の owner/task ID を束縛し、旧 action を保持して新 draft で呼ぶ 4 件の instrumented regression を追加。修正差分の scoped re-review は全指摘解消で完了し、commit `910a682` まで保存済み。
 
-## Task 4 実行中（CI checkpoint）
+## Task 4 実行中（端末 CI 待ち）
 
-- 担当: `/root/task4_implementation`。作業場所はこの worktree。開始点 `910a682`。元 Task4 brief は `.superpowers/sdd/2026-09-30-task-nudge/task-4-brief.md`、進捗は同ディレクトリの `task-4-report.md`。
-- 追加済み: 実 Room + Android 通知 + Receiver の instrumented tests、実 Activity/Compose の操作・通知タップ・回転・文字拡大・権限拒否・スクリーンショット tests、`scripts/check.sh` / `scripts/device-smoke.sh`、SHA 固定の GitHub Actions workflow。
-- ホスト gate は provisioned runner で `:core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --max-workers=1` が exit 0。**端末実行は未確認**。次は feature branch push 後の API35 CI emulator 結果を調べ、失敗を修正する。
-- CI run [36874951511](https://github.com/yutotamura55/task-nudge/actions/runs/36874951511) は setup-android が削除済み `tools` package を要求して project task 前に失敗。両 job に `packages: platform-tools` を明示した `319875f` を push。次の [36875126874](https://github.com/yutotamura55/task-nudge/actions/runs/36875126874) は verify 成功（core34/app67、lint0 errors・2 warnings）だが device job で 23 件開始、5 件完了中 3 件失敗後に instrumentation process が終了。
-- device 報告と logcat の原因: 回転後 landscape + keyboard で保存ボタンはスクロール前の画面外、失敗時に portrait へ戻らず次の screenshot test に影響、許可 revoke は instrumented process の UID を kill。修正はスクロール可能性の確認、必ず portrait 復元、データ観測後 screenshot、拒否 UI にはテスト用の通知無効 gateway 注入。実通知/Receiver テストは引き続き実 Android gateway を使用。次の CI run で全 23 件を実行し直す。
-- 次の [36878631449](https://github.com/yutotamura55/task-nudge/actions/runs/36878631449) は verify 成功、device が **23 件を全実行**、5 件失敗。前回の process kill は解消。実通知 2 件、回転/文字拡大、実画面 capture は成功した。残りは 2 件の detail 履歴が画面外、1 件の入力エラーが IME 下で画面外、1 件のクリック対象 `完了` が履歴行と曖昧、1 件の設定エラー tag 不在（原因調査中）。scroll/click matcher の user outcome を保つ修正を追加し、設定は入力値・Save 有効・unmerged semantics を次 run で診断する。`device-smoke.sh` も失敗時に生成済み画像を回収するよう修正中。
-- [36882096506](https://github.com/yutotamura55/task-nudge/actions/runs/36882096506) は verify 成功（core34/app67、失敗0）、device 23 件を全実行して 5 件失敗。前回の editor scroll と `完了` matcher は通過。large-font/detail 履歴と拒否通知 notice は画面外、起動直後の一覧 FAB は Room 観測前、通知 tap の履歴は LazyColumn で未 materialize。設定は 24/24 入力済み・保存有効を確認したが、IME 表示時の可視コンテンツ下端 y419 に対して保存ボタン y478–518 で、テストのタップは画面外へ入っていた。unmerged tree にも error tag がないのはバリデーション前のため。各操作を bounded wait→scroll→display→click→結果観測に修正中。実画面 capture test は通過したが、Gradle 終了後にアプリ専用 external files の画像ディレクトリが消え、`adb pull` 失敗。capture 中に共有領域へコピーしてサイズ確認する方法に変更中。
-- 全差分の独立レビュー記録は [review-record.md](review-record.md)。Claude Sonnet 5 は端末 pass と実画像を未完の必須成果物とし、テスト Application の親初期化、文字サイズ復元、テスト時計の `withZone`、調査ログを指摘。親初期化は本番 WorkManager 起動を避ける意図をコメント化し、端末スクリプトは元の文字サイズを exit trap で復元、テスト時計は可変時刻をゾーン派生 Clock と共有、調査ログは削除した。旧 gateway の通知 cleanup と無効 gateway の契約説明も追加。端末 CI で再検証後、未完2件を解消したと判断する。
-- README / `docs/testing.md` はローカル commit `31e210d` に追加。実スクリーンショットはまだなく、CI の実画像を確認する前に完成を主張しない。setup-android の Node20 deprecation annotation は SDK setup 成功後も残る既知 warning。
+- 担当: `/root/task4_implementation`。開始点 `910a682`。原 brief と逐次証拠は `.superpowers/sdd/2026-09-30-task-nudge/task-4-brief.md` / `task-4-report.md`。実 Room + Android 通知 + Receiver、Activity/Compose、通知タップ、回転、文字拡大、通知無効、実画像、検証スクリプト、SHA 固定 Actions は実装済み。
+- ホスト gate `scripts/check.sh` は JDK17 / SDK36 / Gradle8.13、`--max-workers=1` で成功。最新の時計境界修正後も exit 0、94 tasks（25 executed / 69 up-to-date）。`git diff --check` も成功。実端末テストは次の CI で確証する。
+- [CI 36950190490](https://github.com/yutotamura55/task-nudge/actions/runs/36950190490) はホスト101/101、API35 emulator 23件中22件成功。3枚の実 Compose PNG は回収・原寸視認済みで、画面撮影境界の問題は解消。ただし履歴画像は記録日 `2026-10-01` に対して、端末の当日 `2026-10-02` として有効な「完了」を表示し、最後の1件が失敗した。画像はまだ掲載しない。
+- 原因は engine/Room がテスト固定 Clock と Tokyo Zone を使う一方、`TaskNudgeApp` が別の `Instant.now()` / `ZoneId.systemDefault()` を読んでいたこと。既存 `AppContainer` の Clock/Zone を MainActivity 経由で UI と共有する最小修正と、2030-04-04 Tokyo の「今日の完了」一覧・詳細回帰を追加した。既存 CI の Activity 失敗が実行時の red、追加テストの修正前 red は新引数欠落による compile failure と区別する。次の CI は instrumented 24件を実行する。
+- 差分4ファイルの独立 read-only review は Copilot CLI の実モデル `claude-sonnet-5` が exit0、blocking defect / 退行なし。全体・先行差分のレビューも [review-record.md](review-record.md) に保存済み。setup-android v3 の Node20 / forced Node24 annotation は既知で、セットアップは成功している。
+- README / [testing.md](testing.md) は日本語の利用・検証手順、API26、専用 test 端末、UTP の app uninstall、CI debug 署名の実行間非固定を記載済み。CI `36950190490` の実スクリーンショット3枚は原寸確認・artifact と SHA-256 照合後 `docs/screenshots/` に保存し、README に掲載した。この run 全体は22/23であり、**最終24件の端末 pass は未確認**。
 
 ## 残る工程
 
-1. Task4 の CI emulator 実行結果を確認して失敗を修正し、実スクリーンショットを検証・保存する。
-2. README と `docs/testing.md` を完成し、host/device gate を確証する。
-3. 全差分を main base `7b401f0` と比較して独立レビュー。下記の確認済み非GPT CLIを優先。
-4. material findingsを修正・必要な再検証・scoped review後、`gh pr create`。PR URL、検証、reviewer/model/findings を報告。PRはまだ未作成。
+1. 時計境界修正を feature branch に push し、API35 CI のホスト101件・instrumented **24件全成功**を確認する。失敗時は XML/logcat/画像を根拠に原因を特定する。
+2. 3画像の撮影元は CI `36950190490` と明示済み。次の成功 run の画像も確認し、差異や品質問題があれば差し替える。README / `docs/testing.md` / この handoff / Task4 report に最終 URL・結果を記録する。
+3. 親担当が source diff なしを確認後、開発 Issue #1 を完了する PR を作成し、PR checks を追跡する。元アイデア #11 は URL 参照だけ。main push / merge はユーザーのみ。
 
-端末テストは API35 emulator で一度起動したが全件成功には至っていない。local KVMは使用不可なので CI の再実行が必要。OEM/reboot/force-stopの実機確認は未実行と明記する。
+ローカル KVM は使用不可。OEM 差、再起動、force stop 後の通知回復は端末環境で未実行として扱う。
 
 ## Toolchain と実行
 
@@ -124,14 +120,4 @@ requestはPython json.dumps等で作り、requirementsとdiffを含める。実�
 
 ## 別 AI に渡す開始指示
 
-> この repo の `AGENTS.md`、`docs/development-handoff.md`、`docs/review-record.md` を読み、`feat/11-task-reminders` の Task 4 最終検証から続けてください。Task 1–3、保存境界再設計、全体レビューと追加差分レビューは完了済みなのでやり直さないでください。CI run `36948348370` の API 35 端末結果を確認し、全 23 件成功と実画像 3 枚を確認した後、画像・日本語文書を commit/push してください。親担当が PR 作成と PR checks を追跡します。main へ push/merge はしないでください。
-
-## 2026-10-02 再開 checkpoint
-
-- Task4 担当が使用上限で停止。コードは `7f38921`、root のレビュー記録は `2a730d4` まで保存済み。
-- CI [36886506402](https://github.com/yutotamura55/task-nudge/actions/runs/36886506402): host 成功、device23件中20件成功、3失敗、error/skip0。rotationの追加ボタン待機/merged semantics、invalid recurrence保存クリックの可視性、画像退避のcommand chainが残る。
-- AOSP の UiAutomationConnection は Runtime.exec(command) を使用し、`&&` をシェルとして解釈しない。画像退避は単純コマンドを分け、実サイズで成功確認する。
-- Copilot CLI の確認済み `claude-sonnet-5` に2つのandroidTestファイルだけ修正委任中。shell禁止、view/editのみ。親がビルド・CI・commit・独立再レビュー・PRを行う。CLIログ `/tmp/task-nudge-review/copilot-fix-output.jsonl`。
-- Gemini 全体レビューと Copilot scoped再レビューは既に完了し、対応後material defectなし。再実行せず、新たな修正差分だけ独立に確認する。
-- 新規共有 skill の手順に合わせ開発先Issue #1 を作成。元アイデアIssueは自動closeせず、PRのclosingは開発先 #1 に対して評価する。
-- CI [36948348370](https://github.com/yutotamura55/task-nudge/actions/runs/36948348370) は host101/101、device23件中22件成功、1件失敗。残りは詳細履歴までスクロール後に画面外となった「今日完了済み」を探すテスト操作。画像3枚は回収されたが、原寸確認で history.png が詳細でなく直前の一覧フレームを写していたため掲載しない。完了ボタンを LazyColumn で再表示してから無効状態を確認し、画像は Compose `captureToImage()` で描画完了した画面を取得する修正を加えた。次 run で23/23と3画像の内容を再確認する。
+> この repo の `AGENTS.md`、`docs/development-handoff.md`、`docs/review-record.md` を読み、`feat/11-task-reminders` の Task 4 最終端末検証から続けてください。Task1–3、保存境界再設計、全体レビューと時計境界の scoped review は完了済みです。時計境界修正を含む次の CI で24件の emulator テスト結果と3枚の画像品質を確認し、handoff / report に最終証拠を記録してください。README 画像は先行CIの実画面を原寸確認して掲載済みで、撮影元を明示しています。親担当が PR 作成・checks 追跡を行います。main へ push / merge はしないでください。
