@@ -27,7 +27,7 @@ Android 13 以上では、明示的に「通知を有効にする」を押した
 
 ## 画面
 
-[API 35 エミュレーターの CI 実行](https://github.com/yutotamura55/task-nudge/actions/runs/36950190490)で撮影し、原寸で確認した実画面です。
+[API 35 エミュレーターの CI 実行](https://github.com/yutotamura55/task-nudge/actions/runs/36952478562)で撮影し、原寸で確認した実画面です。
 
 | タスク一覧 | 完了履歴 | 通知設定 |
 | --- | --- | --- |
