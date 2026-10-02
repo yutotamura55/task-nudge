@@ -9,7 +9,7 @@
 - Source Issue: https://github.com/yutotamura55/my-software-ideas/issues/11 （OPEN）。
 - Branch: `feat/11-task-reminders`。Base: `origin/main` の `7b401f0`。
 - **main へ push・merge・auto-merge・merge queue を行わない。マージはユーザーのみ。**
-- 合意した Issue 要件を全部満たせば PR に `Closes yutotamura55/my-software-ideas#11`。部分完了なら通常リンクと残作業を記す。
+- 新しい共有 workflow に従い、元アイデア #11 は通常 URL で参照。開発先 [task-nudge #1](https://github.com/yutotamura55/task-nudge/issues/1) の受け入れ条件を全部満たせば PR に `Closes #1`。部分完了なら通常リンクと残作業を記す。
 - ユーザーの追加指示: 修正を繰り返してテストを通すだけではなく、設計の変更容易性・保守性を評価する。トークン制限後や他 AI への引き継ぎでも再開可能にする。
 
 ## 再開場所
@@ -125,3 +125,12 @@ requestはPython json.dumps等で作り、requirementsとdiffを含める。実�
 ## 別 AI に渡す開始指示
 
 > このrepoの `docs/development-handoff.md` と AGENTS.md を読み、`feat/11-task-reminders` の保存境界再設計の途中から続けてください。Task1–3 と toolchain はやり直さず、現在diffを維持してください。subagent-driven-developmentで、再設計の完成・独立レビュー・Task4 CI/device/docs・全体非GPTレビュー・PR作成まで進めてください。mainのpush/mergeはしないでください。
+
+## 2026-10-02 再開 checkpoint
+
+- Task4 担当が使用上限で停止。コードは `7f38921`、root のレビュー記録は `2a730d4` まで保存済み。
+- CI [36886506402](https://github.com/yutotamura55/task-nudge/actions/runs/36886506402): host 成功、device23件中20件成功、3失敗、error/skip0。rotationの追加ボタン待機/merged semantics、invalid recurrence保存クリックの可視性、画像退避のcommand chainが残る。
+- AOSP の UiAutomationConnection は Runtime.exec(command) を使用し、`&&` をシェルとして解釈しない。画像退避は単純コマンドを分け、実サイズで成功確認する。
+- Copilot CLI の確認済み `claude-sonnet-5` に2つのandroidTestファイルだけ修正委任中。shell禁止、view/editのみ。親がビルド・CI・commit・独立再レビュー・PRを行う。CLIログ `/tmp/task-nudge-review/copilot-fix-output.jsonl`。
+- Gemini 全体レビューと Copilot scoped再レビューは既に完了し、対応後material defectなし。再実行せず、新たな修正差分だけ独立に確認する。
+- 新規共有 skill の手順に合わせ開発先Issue #1 を作成。元アイデアIssueは自動closeせず、PRのclosingは開発先 #1 に対して評価する。

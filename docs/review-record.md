@@ -35,3 +35,13 @@ Copilot の `claude-opus-4.6` は利用不可と明示的に終了したため�
 Copilot の `-p` と標準入力の組合せでは、本文がレビュー会話に入らなかった。user.message に差分がないことを検出し、シェル展開を使わず subprocess の引数として本文を渡して再実行した。本文のない応答はレビュー実施として数えていない。
 
 全体レビュー後の変更も、PR 作成前に追加で確認する。PR はユーザーがマージする。
+
+## 端末検証3件の追加修正（2026-10-02）
+
+CI `36886506402` はホスト成功、device23件中20件成功、3失敗。担当agentが使用上限で停止したため、確認済み Copilot CLI `claude-sonnet-5` へ androidTest2ファイルだけの修正を委任した。view/edit以外は不可、shell・本体変更・委任禁止。実際の変更は指定2ファイルのみ。
+
+追加ボタンの bounded wait と表示確認を共通化し、invalid input の保存前にスクロール・表示確認、結果の bounded wait を追加。UiAutomationのcommand chainを単純コマンドに分け、画像退避先の実サイズを元ファイルと比較する。
+
+親が `scripts/check.sh` を実行し exit0（94tasks、9executed、85up-to-date）を確認。別モデル Gemini に追加差分を読み取り専用レビュー依頼中。端末での全件passと画像回収は引き続き未完。
+
+新しい共有 idea workflow に合わせ、元アイデアはURL参照、開発先Issue [#1](https://github.com/yutotamura55/task-nudge/issues/1) を受け入れ条件・closingの単位とした。

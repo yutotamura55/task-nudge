@@ -126,15 +126,18 @@ class TaskScreensTest {
     @Test fun inputErrorsRemainInlineAndDoNotSave() {
         val repo = ScreenRepository(); launch(repo)
         compose.onNodeWithContentDescription("タスクを追加").performClick()
-        compose.onNodeWithText("保存").performClick()
-        compose.onNodeWithText("タイトルは1〜100文字で入力してください").assertIsDisplayed()
+        compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("タイトルは1〜100文字で入力してください", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("タイトルは1〜100文字で入力してください").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("タイトル").performTextInput("a".repeat(101))
-        compose.onNodeWithText("保存").performClick()
-        compose.onNodeWithText("タイトルは1〜100文字で入力してください").assertIsDisplayed()
+        compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("タイトルは1〜100文字で入力してください", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("タイトルは1〜100文字で入力してください").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("タイトル").performTextReplacement("腕")
         compose.onNodeWithText("繰り返しを設定").performClick()
         compose.onNodeWithText("繰り返し（日）").performTextReplacement("0")
-        compose.onNodeWithText("保存").performClick()
+        compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick()
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("繰り返しは1〜365日の整数で入力してください", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("繰り返しは1〜365日の整数で入力してください").performScrollTo().assertIsDisplayed()
         assertTrue(repo.data.value.tasks.isEmpty())
     }
