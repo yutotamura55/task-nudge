@@ -34,7 +34,7 @@ git log -8 --oneline
 - `docs/superpowers/specs/2026-09-30-task-nudge-design.md`
 - `docs/superpowers/plans/2026-09-30-task-nudge.md`
 - **最新の境界再設計:** `docs/superpowers/specs/2026-10-01-command-boundaries.md`
-- **現在実行中:** `docs/superpowers/plans/2026-10-01-command-boundaries.md`
+- **完了した追加計画:** `docs/superpowers/plans/2026-10-01-command-boundaries.md`
 
 ## 完了済みの単位
 
@@ -66,24 +66,20 @@ Task1–3 の実装・修正担当は **gpt-6.1-sol high**。architecture review
 - 指定 gate `:core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --max-workers=1` は exit 0。lint 0 errors / 既知の kapt warning 1件。
 - ローカル記録 `.superpowers/sdd/2026-09-30-task-nudge/command-boundaries-report.md` に状態遷移と検証を保存。独立した combined correctness/design review は、旧画面 callback が実行時の新 session/task ID を読む Important 指摘を出した。各 screen callback に生成時の owner/task ID を束縛し、旧 action を保持して新 draft で呼ぶ 4 件の instrumented regression を追加。修正差分の scoped re-review は全指摘解消で完了し、commit `910a682` まで保存済み。
 
-## Task 4 実行中（端末 CI 待ち）
+## 最終検証と PR
 
-- 担当: `/root/task4_implementation`。開始点 `910a682`。原 brief と逐次証拠は `.superpowers/sdd/2026-09-30-task-nudge/task-4-brief.md` / `task-4-report.md`。実 Room + Android 通知 + Receiver、Activity/Compose、通知タップ、回転、文字拡大、通知無効、実画像、検証スクリプト、SHA 固定 Actions は実装済み。
-- ホスト gate `scripts/check.sh` は JDK17 / SDK36 / Gradle8.13、`--max-workers=1` で成功。最新の時計境界修正後も exit 0、94 tasks（25 executed / 69 up-to-date）。`git diff --check` も成功。実端末テストは次の CI で確証する。
-- [CI 36950190490](https://github.com/yutotamura55/task-nudge/actions/runs/36950190490) はホスト101/101、API35 emulator 23件中22件成功。3枚の実 Compose PNG は回収・原寸視認済みで、画面撮影境界の問題は解消。ただし履歴画像は記録日 `2026-10-01` に対して、端末の当日 `2026-10-02` として有効な「完了」を表示し、最後の1件が失敗した。これが時計境界修正の証拠となった。
-- 原因は engine/Room がテスト固定 Clock と Tokyo Zone を使う一方、`TaskNudgeApp` が別の `Instant.now()` / `ZoneId.systemDefault()` を読んでいたこと。既存 `AppContainer` の Clock/Zone を MainActivity 経由で UI と共有する最小修正と、2030-04-04 Tokyo の「今日の完了」一覧・詳細回帰を追加した。既存 CI の Activity 失敗が実行時の red、追加テストの修正前 red は新引数欠落による compile failure と区別する。次の CI は instrumented 24件を実行する。
-- 差分4ファイルの独立 read-only review は Copilot CLI の実モデル `claude-sonnet-5` が exit0、blocking defect / 退行なし。全体・先行差分のレビューも [review-record.md](review-record.md) に保存済み。setup-android v3 の Node20 / forced Node24 annotation は既知で、セットアップは成功している。
-- README / [testing.md](testing.md) は日本語の利用・検証手順、API26、専用 test 端末、UTP の app uninstall、CI debug 署名の実行間非固定を記載済み。CI `36950190490` の実スクリーンショット3枚は原寸確認・artifact と SHA-256 照合後 `docs/screenshots/` に保存し、README に掲載した。この run 全体は22/23であり、**最終24件の端末 pass は未確認**。
+- 実装・保存境界再設計・時計共有・独立レビュー・Task4は完了。検証したsource commitは `6d4db8f`。
+- [PR #2](https://github.com/yutotamura55/task-nudge/pull/2) は `main` 向け。マージはユーザーが行う。現在のdraft/ready・checksはPRを参照する。
+- [PR CI 36963062421](https://github.com/yutotamura55/task-nudge/actions/runs/36963062421) と [push CI 36963059186](https://github.com/yutotamura55/task-nudge/actions/runs/36963059186) はともにSUCCESS。各XMLは単体101件、API35端末24件、失敗・error・skipいずれも0件。lint・debug/test APKビルドも成功。
+- 一覧・詳細履歴・設定の3PNGを原寸確認。両runのartifactと掲載画像のSHA-256はすべて一致。「今日の完了1/2」「今日完了済み」無効、履歴1件、時間9–21/30分を確認。README、testing、review-recordに証跡を保存。
+- 独立reviewerはGemini `gemini-3.1-pro-high` とCopilot CLI `claude-sonnet-5`（実ログ確認）。重大な欠陥は修正・再レビュー済み。保存前OS照合のP2可用性制約は設計上の判断として残す。
+- 最終source後の変更は文書のみ。新しいCI状態はPRのchecksを参照し、過去の検証済みsourceを誤って再実装しない。
 
-## 残る工程
+## 今後の作業
 
-最新状態: commit `beef056`、[draft PR #2](https://github.com/yutotamura55/task-nudge/pull/2)。push CI [36952478562](https://github.com/yutotamura55/task-nudge/actions/runs/36952478562) はホスト成功・端末24/24成功。同じcommitのPR CI [36952524280](https://github.com/yutotamura55/task-nudge/actions/runs/36952524280) はホスト成功・端末23/24成功。文字拡大テストが、保存後の非同期遷移前にeditorのスクロール領域で詳細履歴を探して失敗した。Copilot CLIへScreenshotTestだけの限定修正を委任中。担当subagentは使用上限で停止、親が検証とレビュー・CI追跡を引き継いだ。全件成功をPRでも確認するまでdraftのまま。
+依頼されたMVP開発は完了。PRのレビューへの対応とユーザーによるマージを待つ。新しい指摘がある場合のみ、該当範囲を調査・修正・独立レビュー・再検証する。完了済みTask1–4やtoolchainを再実行する必要はない。
 
-1. 時計境界修正を feature branch に push し、API35 CI のホスト101件・instrumented **24件全成功**を確認する。失敗時は XML/logcat/画像を根拠に原因を特定する。
-2. 3画像の撮影元は CI `36950190490` と明示済み。次の成功 run の画像も確認し、差異や品質問題があれば差し替える。README / `docs/testing.md` / この handoff / Task4 report に最終 URL・結果を記録する。
-3. 親担当が source diff なしを確認後、開発 Issue #1 を完了する PR を作成し、PR checks を追跡する。元アイデア #11 は URL 参照だけ。main push / merge はユーザーのみ。
-
-ローカル KVM は使用不可。OEM 差、再起動、force stop 後の通知回復は端末環境で未実行として扱う。
+OEMの省電力・再起動・force-stop・転送、実OSの通知拒否/再許可は機種別手動確認が未実行。CI debug APKは試用で、run間の署名互換を保証しない。これらは合意MVPの確認範囲と制約としてREADME/testingに明記済み。
 
 ## Toolchain と実行
 
@@ -122,4 +118,4 @@ requestはPython json.dumps等で作り、requirementsとdiffを含める。実�
 
 ## 別 AI に渡す開始指示
 
-> この repo の `AGENTS.md`、`docs/development-handoff.md`、`docs/review-record.md` を読み、`feat/11-task-reminders` の Task 4 最終端末検証から続けてください。Task1–3、保存境界再設計、全体レビューと時計境界の scoped review は完了済みです。時計境界修正を含む次の CI で24件の emulator テスト結果と3枚の画像品質を確認し、handoff / report に最終証拠を記録してください。README 画像は先行CIの実画面を原寸確認して掲載済みで、撮影元を明示しています。親担当が PR 作成・checks 追跡を行います。main へ push / merge はしないでください。
+> AGENTS.md、development-handoff.md、review-record.mdとPR #2の最新checks/レビューを確認してください。MVP実装・独立レビュー・単体101件/端末24件・実画像3枚は完了済みです。新しい指摘があればその範囲だけ対応し、完了済み工程を再開しないでください。mainへpush/merge/auto-mergeは行わず、worktreeを保持してください。
