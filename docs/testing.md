@@ -15,7 +15,7 @@ Android 8.0（API 26）以上の**専用テスト端末またはエミュレー�
 
 GitHub Actions は pull request と feature/main branch push でホスト検証を実行し、続けて API 35 Google APIs x86_64 エミュレーターで端末テストを走らせます。成功した run の `task-nudge-debug` に APK、`host-test-results` に JVM/lint、`android-test-results` に instrumentation 結果と実画面画像があります。失敗時も利用できる結果を artifact に残します。ローカルで `/dev/kvm` が使えない場合は、CI の emulator job の成功を確認するまで端末検証を完了と扱いません。
 
-README の3画像は [CI 実行 36952478562](https://github.com/yutotamura55/task-nudge/actions/runs/36952478562) の API35 実画面を原寸確認して掲載しています。この push 実行は単体101件・端末24件が成功しました。同じコミットの PR CI では文字拡大テストが保存後の非同期遷移前に詳細履歴を探索して失敗したため、遷移先を確認する待機を追加して再検証します。最終 PR checks は [PR #2](https://github.com/yutotamura55/task-nudge/pull/2) を参照してください。
+README の3画像は [成功したCI 36952478562](https://github.com/yutotamura55/task-nudge/actions/runs/36952478562) のAPI35実画面です。最終source `6d4db8f` の [PR CI 36963062421](https://github.com/yutotamura55/task-nudge/actions/runs/36963062421) と [push CI 36963059186](https://github.com/yutotamura55/task-nudge/actions/runs/36963059186) は単体101件・端末24件がすべて成功。両runの画像も掲載画像とSHA-256一致を確認しました。現在のchecksは [PR #2](https://github.com/yutotamura55/task-nudge/pull/2) を参照してください。
 
 ## 手動確認（機種ごとの差を見る）
 

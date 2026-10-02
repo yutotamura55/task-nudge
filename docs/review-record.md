@@ -1,6 +1,6 @@
 # MVP レビュー記録
 
-作業 branch: `feat/11-task-reminders`。base: `7b401f0`。完了状態・検証した commit は [development-handoff.md](development-handoff.md) を参照。この記録の作成時点では端末検証・画面画像の回収が未完了。
+作業 branch: `feat/11-task-reminders`。base: `7b401f0`。完了状態・検証した commit は [development-handoff.md](development-handoff.md) を参照。以下の各節は実施時点の記録。最終結果は末尾を参照。
 
 ## 全体レビュー
 
@@ -76,3 +76,7 @@ Clock/zone の所有者を AppContainer にそろえ、UI と engine へ同じ�
 - 独立reviewer: Gemini (`agy`)、実モデル `gemini-3.1-pro-high`、SUCCESS。要件と全差分・現在のテスト/画面コードを提示、ツール実行・編集・委任なし。重大な問題・退行の指摘なし。将来の同名タイトルとAPI簡略化は非blocking提案で、現在のテスト入力には該当しない。
 - ローカル `scripts/check.sh` exit0（94tasks、8executed、86up-to-date）。端末ではPR再実行で確認する。
 - 成功したpush runの画像3枚を親が原寸確認。今日の完了1/2、詳細の今日完了済み、履歴1件、設定を確認し、README画像を更新した。
+
+## 最終結果
+
+source `6d4db8f` のPR CI `36963062421`・push CI `36963059186` はともにSUCCESS。各runで単体101件・端末24件、失敗/error/skip0をXML確認。実画像3枚は原寸確認・掲載PNGとのSHA-256一致を確認した。端末全件pass・実画像という必須成果物は解消済み。合意MVPのmaterial findingは残っていない。OS通知照合失敗時の保存制限は上記P2判断として維持する。最終記録の変更は文書のみで、本体・テストは検証済みsourceと同一。
