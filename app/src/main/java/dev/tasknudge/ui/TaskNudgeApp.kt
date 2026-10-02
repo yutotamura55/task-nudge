@@ -19,7 +19,7 @@ import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.tasknudge.data.TaskRepository
 import kotlinx.coroutines.delay
-import java.time.Instant
+import java.time.Clock
 import java.time.ZoneId
 
 enum class NotificationEnableAction { REQUEST, SETTINGS }
@@ -28,7 +28,14 @@ fun notificationEnableAction(api: Int, granted: Boolean, requested: Boolean): No
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TaskNudgeApp(repository: TaskRepository, notificationsEnabled: Boolean, onEnableNotifications: () -> Unit, initialTaskId: Long? = null) {
+fun TaskNudgeApp(
+    repository: TaskRepository,
+    notificationsEnabled: Boolean,
+    onEnableNotifications: () -> Unit,
+    initialTaskId: Long? = null,
+    clock: Clock = Clock.systemUTC(),
+    zoneProvider: () -> ZoneId = { ZoneId.systemDefault() },
+) {
     val factory = remember(repository) {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
@@ -50,13 +57,14 @@ fun TaskNudgeApp(repository: TaskRepository, notificationsEnabled: Boolean, onEn
         screen = destination
     }
     var showArchived by rememberSaveable { mutableStateOf(false) }
-    var now by remember { mutableStateOf(Instant.now()) }
+    var now by remember(clock) { mutableStateOf(clock.instant()) }
     val lifecycleOwner = LocalLifecycleOwner.current
-    LaunchedEffect(lifecycleOwner) {
+    LaunchedEffect(lifecycleOwner, clock) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) { now = Instant.now(); delay(30_000) }
+            while (true) { now = clock.instant(); delay(30_000) }
         }
     }
+    val zone = zoneProvider()
     LaunchedEffect(initialTaskId) {
         if (initialTaskId != null && initialTaskId != routedTaskId) {
             routedTaskId = initialTaskId; navigate("detail", initialTaskId)
@@ -129,9 +137,9 @@ fun TaskNudgeApp(repository: TaskRepository, notificationsEnabled: Boolean, onEn
                         screen == "settings" -> SettingsScreen(snapshot.settings, snapshot.permissionRequested, notificationsEnabled, state, { if (sessionId == owner) onEnableNotifications() }) { start, end, interval -> vm.saveSettings(start, end, interval, owner) }
                         screen == "detail" && task != null -> {
                             val taskId = task.id
-                            TaskDetailScreen(task, !state.canSubmit, now, ZoneId.systemDefault(), { navigateFrom(owner, "editor", taskId) }, { vm.completeTask(taskId, owner) }, { vm.setArchived(taskId, it, owner) })
+                            TaskDetailScreen(task, !state.canSubmit, now, zone, { navigateFrom(owner, "editor", taskId) }, { vm.completeTask(taskId, owner) }, { vm.setArchived(taskId, it, owner) })
                         }
-                        else -> TaskListScreen(snapshot.tasks, showArchived, { if (sessionId == owner) showArchived = it }, notificationsEnabled, snapshot.permissionRequested, { if (sessionId == owner) onEnableNotifications() }, !state.canSubmit, now, ZoneId.systemDefault(), { navigateFrom(owner, "detail", it) }, { vm.completeTask(it, owner) })
+                        else -> TaskListScreen(snapshot.tasks, showArchived, { if (sessionId == owner) showArchived = it }, notificationsEnabled, snapshot.permissionRequested, { if (sessionId == owner) onEnableNotifications() }, !state.canSubmit, now, zone, { navigateFrom(owner, "detail", it) }, { vm.completeTask(it, owner) })
                     }
                 }
             }

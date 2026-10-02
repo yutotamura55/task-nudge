@@ -27,7 +27,11 @@ Android 13 以上では、明示的に「通知を有効にする」を押した
 
 ## 画面
 
-実際の API 35 エミュレーターで検証した画像を `docs/screenshots/` に保存します。
+[API 35 エミュレーターの CI 実行](https://github.com/yutotamura55/task-nudge/actions/runs/36950190490)で撮影し、原寸で確認した実画面です。
+
+| タスク一覧 | 完了履歴 | 通知設定 |
+| --- | --- | --- |
+| <img src="docs/screenshots/tasks.png" width="220" alt="タスク一覧と今日の完了数"> | <img src="docs/screenshots/history.png" width="220" alt="タスク詳細と実行履歴"> | <img src="docs/screenshots/settings.png" width="220" alt="通知時間と間隔の設定"> |
 
 ## 開発と検証
 

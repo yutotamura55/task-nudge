@@ -12,13 +12,29 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
 
 class TaskScreensTest {
     @get:Rule val compose = createComposeRule()
     private fun launch(repo: ScreenRepository, enabled: Boolean = true, initial: Long? = null, enable: () -> Unit = {}) {
         compose.setContent { TaskNudgeTheme(dynamicColor = false) { TaskNudgeApp(repo, enabled, enable, initial) } }
+    }
+    @Test fun injectedClockAndZoneShowTodaysCompletionOnListAndDetail() {
+        val clock = Clock.fixed(Instant.parse("2030-04-03T15:30:00Z"), ZoneOffset.UTC)
+        val completion = CompletionRecord(2, Instant.parse("2030-04-03T15:00:00Z"), LocalDate.of(2030, 4, 4))
+        val repo = ScreenRepository(listOf(sampleTask().copy(completions = listOf(completion))))
+        compose.setContent {
+            TaskNudgeTheme(dynamicColor = false) {
+                TaskNudgeApp(repo, true, {}, clock = clock, zoneProvider = { ZoneId.of("Asia/Tokyo") })
+            }
+        }
+        compose.onNodeWithText("今日の完了 1 / 1").assertIsDisplayed()
+        compose.onNodeWithText("首").performClick()
+        compose.onNodeWithText("今日完了済み").assertIsDisplayed().assertIsNotEnabled()
     }
     @Test fun titleOnlyAddSavesDailyTask() {
         val repo = ScreenRepository(); launch(repo)

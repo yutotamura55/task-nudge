@@ -15,6 +15,8 @@ Android 8.0（API 26）以上の**専用テスト端末またはエミュレー�
 
 GitHub Actions は pull request と feature/main branch push でホスト検証を実行し、続けて API 35 Google APIs x86_64 エミュレーターで端末テストを走らせます。成功した run の `task-nudge-debug` に APK、`host-test-results` に JVM/lint、`android-test-results` に instrumentation 結果と実画面画像があります。失敗時も利用できる結果を artifact に残します。ローカルで `/dev/kvm` が使えない場合は、CI の emulator job の成功を確認するまで端末検証を完了と扱いません。
 
+README の3画像は [CI 実行 36950190490](https://github.com/yutotamura55/task-nudge/actions/runs/36950190490) の `android-test-results` に保存された API 35 実画面を原寸確認して掲載しています。この実行の端末テストは23件中22件成功で、保存処理の固定時計と画面時計が異なる不具合を発見しました。時計境界の修正と回帰テストを追加した後の全24件の結果は、後続CIで確認します。
+
 ## 手動確認（機種ごとの差を見る）
 
 1. 通知を許可・拒否した状態でタスクを追加し、拒否中も一覧・詳細・手動完了・履歴が使えることを確認します。再許可後はアプリを開き、通知が再開することを確認します。
