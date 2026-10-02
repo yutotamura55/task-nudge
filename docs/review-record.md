@@ -42,6 +42,6 @@ CI `36886506402` はホスト成功、device23件中20件成功、3失敗。担�
 
 追加ボタンの bounded wait と表示確認を共通化し、invalid input の保存前にスクロール・表示確認、結果の bounded wait を追加。UiAutomationのcommand chainを単純コマンドに分け、画像退避先の実サイズを元ファイルと比較する。
 
-親が `scripts/check.sh` を実行し exit0（94tasks、9executed、85up-to-date）を確認。別モデル Gemini に追加差分を読み取り専用レビュー依頼中。端末での全件passと画像回収は引き続き未完。
+親が `scripts/check.sh` を実行し exit0（94tasks、9executed、85up-to-date）を確認。別モデル Gemini (`gemini-3.1-pro-high`、実行ログ確認済み) の追加差分レビューは SUCCESS、重大な欠陥なし。対象は `7f38921` 以降のテスト修正と workflow 文書更新。ツール実行・編集・委任なし。端末での全件passと画像回収は引き続き未完。
 
 新しい共有 idea workflow に合わせ、元アイデアはURL参照、開発先Issue [#1](https://github.com/yutotamura55/task-nudge/issues/1) を受け入れ条件・closingの単位とした。
