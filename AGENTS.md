@@ -10,7 +10,7 @@ Read the workspace AGENTS.md and the design/plan in docs/superpowers before impl
 - Fetch the remote default branch before new independent work; use dedicated feat/fix/chore branches. Current MVP work uses feat/11-task-reminders.
 - The user selected subagent-driven-development for this MVP. Review each task and the complete diff independently. Prefer a read-only CLI review with a confirmed non-GPT model; document fallback if unavailable.
 - Only the user merges. Do not push directly to main, merge PRs, enable auto-merge, or enqueue a PR.
-- Original idea is https://github.com/yutotamura55/my-software-ideas/issues/11. Assess completion before PR creation: use a cross-repository closing keyword if the agreed Issue scope is complete; otherwise link it without closing and explain the remaining work.
+- Original idea is https://github.com/yutotamura55/my-software-ideas/issues/11; implementation tracking is https://github.com/yutotamura55/task-nudge/issues/1. Follow the shared my-software-ideas-issue-workflow: link the original idea without a closing keyword. Use `Closes #1` only when the development Issue is fully addressed; otherwise link it and state remaining work.
 
 ## Verification
 

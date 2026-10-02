@@ -37,8 +37,7 @@ class ScreenshotTest {
 
     @Test fun titleOnlyAddDetailAndManualCompletionWorkInActivity() {
         ActivityScenario.launch(MainActivity::class.java).use {
-            compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("タスクを追加").fetchSemanticsNodes().isNotEmpty() }
-            compose.onNodeWithContentDescription("タスクを追加").performClick()
+            clickAddFab()
             compose.onNodeWithText("タイトル").performTextInput("首のストレッチ")
             saveVisibleEditor()
             scrollToVisibleText("実行履歴（0回）")
@@ -52,7 +51,7 @@ class ScreenshotTest {
     @Test fun rotationKeepsDraftAndLargeFontKeepsActionsReachable() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             try {
-                compose.onNodeWithContentDescription("タスクを追加").performClick()
+                clickAddFab()
                 compose.onNodeWithText("タイトル").performTextInput("回転しても残る下書き")
                 scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
                 compose.waitUntil(10_000) { var landscape = false; scenario.onActivity { landscape = it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }; landscape }
@@ -73,7 +72,7 @@ class ScreenshotTest {
                     scenario.onActivity { enlarged = it.resources.configuration.fontScale >= 1.7f }
                     enlarged
                 }
-                compose.onNodeWithContentDescription("タスクを追加").performClick()
+                clickAddFab()
                 compose.onNodeWithText("タイトル").performTextInput("大きな文字でも追加")
                 saveVisibleEditor()
                 scrollToVisibleText("実行履歴（0回）")
@@ -85,7 +84,7 @@ class ScreenshotTest {
         app.resetFixture(notificationsEnabled = false)
         ActivityScenario.launch(MainActivity::class.java).use {
             scrollToVisibleText("通知が無効です")
-            compose.onNodeWithContentDescription("タスクを追加").performClick()
+            clickAddFab()
             compose.onNodeWithText("タイトル").performTextInput("通知なしでも記録")
             saveVisibleEditor()
             scrollToVisibleText("実行履歴（0回）")
@@ -100,7 +99,7 @@ class ScreenshotTest {
         app.container.repository.completeTask(taskId)
         assertEquals(2, app.container.repository.snapshots.first().tasks.size)
         ActivityScenario.launch(MainActivity::class.java).use {
-            compose.onNodeWithContentDescription("タスクを追加").assertIsDisplayed()
+            waitForAddFabVisible()
             compose.onNode(hasScrollAction()).performScrollToNode(hasText("首のストレッチ"))
             compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
             capture("tasks")
@@ -131,7 +130,7 @@ class ScreenshotTest {
             compose.onNodeWithText("タスクの詳細").assertIsDisplayed()
             scrollToVisibleText("実行履歴（0回）")
             compose.onNodeWithContentDescription("戻る").performClick()
-            compose.onNodeWithContentDescription("タスクを追加").assertIsDisplayed()
+            waitForAddFabVisible()
             notification.notification.contentIntent.send()
             compose.waitUntil(10_000) { compose.onAllNodesWithText("タスクの詳細").fetchSemanticsNodes().isNotEmpty() }
             scrollToVisibleText("実行履歴（0回）")
@@ -150,11 +149,32 @@ class ScreenshotTest {
         val file = File(directory, "$name.png")
         file.outputStream().use { assertTrue(screenshot.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)) }
         screenshot.recycle()
-        val sharedFile = "/sdcard/Pictures/TaskNudgeTest/$name.png"
-        assertEquals("copied", shell("mkdir -p /sdcard/Pictures/TaskNudgeTest && cp ${file.absolutePath} $sharedFile && test -s $sharedFile && echo copied").trim())
+        val sourceSize = file.length()
+        assertTrue("Compressed screenshot $file should not be empty", sourceSize > 0)
+
+        // UiAutomation#executeShellCommand runs Runtime.exec directly (no shell), so each
+        // step must be a separate command; `&&`/`;` chaining is passed through literally.
+        val sharedDir = "/sdcard/Pictures/TaskNudgeTest"
+        val sharedFile = "$sharedDir/$name.png"
+        shell("mkdir -p $sharedDir")
+        shell("cp ${file.absolutePath} $sharedFile")
+        val copiedSizeOutput = shell("stat -c %s $sharedFile").trim()
+        assertEquals(
+            "Expected copied screenshot $sharedFile to be $sourceSize bytes (same as $file) " +
+                "but shell `stat` reported '$copiedSizeOutput'",
+            sourceSize,
+            copiedSizeOutput.toLongOrNull(),
+        )
     }
 
     private fun saveVisibleEditor() { compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick() }
+
+    private fun clickAddFab() { waitForAddFabVisible(); compose.onNodeWithContentDescription("タスクを追加").performClick() }
+
+    private fun waitForAddFabVisible() {
+        compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("タスクを追加").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("タスクを追加").assertIsDisplayed()
+    }
 
     private fun scrollToVisibleText(value: String) {
         compose.waitUntil(10_000) { compose.onAllNodes(hasScrollAction()).fetchSemanticsNodes().isNotEmpty() }
