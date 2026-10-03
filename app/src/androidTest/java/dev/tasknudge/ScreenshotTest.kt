@@ -141,7 +141,13 @@ class ScreenshotTest {
         app.container.repository.saveSettings(ReminderSettings(0, 24, 30))
         val taskId = app.container.repository.saveTask(null, "通知から開く", 1)
         app.container.engine.evaluate()
-        val notification = app.getSystemService(NotificationManager::class.java).activeNotifications.single { it.id == AndroidNotificationGateway.NOTIFICATION_ID }
+        val notificationManager = app.getSystemService(NotificationManager::class.java)
+        compose.waitUntil(10_000) {
+            notificationManager.activeNotifications.any {
+                it.id == AndroidNotificationGateway.NOTIFICATION_ID && it.notification.extras.getLong("taskId") == taskId
+            }
+        }
+        val notification = notificationManager.activeNotifications.single { it.id == AndroidNotificationGateway.NOTIFICATION_ID }
         val monitor = instrumentation.addMonitor(MainActivity::class.java.name, null, false)
         var activity: MainActivity? = null
         try {
