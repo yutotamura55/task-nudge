@@ -56,6 +56,7 @@ fun TaskListScreen(
         }
         items(visible, key = { it.id }) { task ->
             val largeText = LocalDensity.current.fontScale >= 1.5f
+            val completedToday = task.completions.any { it.localDate == today }
             val details: @Composable (Modifier) -> Unit = { modifier ->
                 Column(modifier) {
                     Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = if (largeText) 3 else 2, overflow = TextOverflow.Ellipsis)
@@ -65,8 +66,8 @@ fun TaskListScreen(
             }
             val completeAction: @Composable () -> Unit = {
                 if (!task.archived) {
-                    TextButton(onClick = { onComplete(task.id) }, enabled = !saving && task.completions.none { it.localDate == today }) {
-                        Text(if (task.completions.any { it.localDate == today }) "今日完了済み" else "完了")
+                    TextButton(onClick = { onComplete(task.id) }, enabled = !saving && !completedToday) {
+                        Text(if (completedToday) "今日完了済み" else "完了")
                     }
                 }
             }

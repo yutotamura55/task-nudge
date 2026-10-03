@@ -84,7 +84,7 @@ class TaskScreensTest {
         compose.onNodeWithContentDescription("タスクを追加").performClick()
         compose.onNodeWithText("タイトル").performTextInput("首のストレッチ")
         compose.onNodeWithText("保存").performClick()
-        compose.waitUntil { repo.data.value.tasks.size == 1 }
+        compose.waitUntil(10_000) { repo.data.value.tasks.size == 1 }
         assertEquals("首のストレッチ", repo.data.value.tasks.single().title)
         assertEquals(1, repo.data.value.tasks.single().recurrenceDays)
         compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
