@@ -7,6 +7,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
@@ -54,20 +55,34 @@ fun TaskListScreen(
             Text(if (tasks.isEmpty()) "まだタスクがありません。＋から、思い出したい行動を追加しましょう。" else "実行中のタスクがありません。停止中のタスクはいつでも再開できます。", style = MaterialTheme.typography.bodyLarge)
         }
         items(visible, key = { it.id }) { task ->
-            Card(onClick = { onOpenTask(task.id) }, modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        Text(taskStatus(task, now, zone), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                        Text("完了 ${task.completions.size}回", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val largeText = LocalDensity.current.fontScale >= 1.5f
+            val details: @Composable (Modifier) -> Unit = { modifier ->
+                Column(modifier) {
+                    Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = if (largeText) 3 else 2, overflow = TextOverflow.Ellipsis)
+                    Text(taskStatus(task, now, zone), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    Text("完了 ${task.completions.size}回", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            val completeAction: @Composable () -> Unit = {
+                if (!task.archived) {
+                    TextButton(onClick = { onComplete(task.id) }, enabled = !saving && task.completions.none { it.localDate == today }) {
+                        Text(if (task.completions.any { it.localDate == today }) "今日完了済み" else "完了")
                     }
-                    if (!task.archived) {
-                        TextButton(onClick = { onComplete(task.id) }, enabled = !saving && task.completions.none { it.localDate == today }) {
-                            Text(if (task.completions.any { it.localDate == today }) "今日完了済み" else "完了")
-                        }
+                }
+            }
+            Card(onClick = { onOpenTask(task.id) }, modifier = Modifier.fillMaxWidth()) {
+                if (largeText) {
+                    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)) {
+                        details(Modifier.fillMaxWidth())
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { completeAction() }
+                    }
+                } else {
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        details(Modifier.weight(1f))
+                        completeAction()
                     }
                 }
             }
