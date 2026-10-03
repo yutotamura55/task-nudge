@@ -27,11 +27,12 @@ class TaskScreensTest {
     private fun launch(repo: ScreenRepository, enabled: Boolean = true, initial: Long? = null, enable: () -> Unit = {}) {
         compose.setContent { TaskNudgeTheme(dynamicColor = false) { TaskNudgeApp(repo, enabled, enable, initial) } }
     }
-    @Test fun threeTasksRemainVisibleWithoutScrollingInACompactList() {
+    @Test fun fourTasksRemainVisibleWithoutScrollingInACompactList() {
         val tasks = listOf(
             sampleTask(),
             sampleTask().copy(id = 2, title = "肩"),
             sampleTask().copy(id = 3, title = "足"),
+            sampleTask().copy(id = 4, title = "腰"),
         )
         var openedTask: Long? = null
         compose.setContent {
@@ -43,8 +44,8 @@ class TaskScreensTest {
                 }
             }
         }
-        compose.onNodeWithText("足").assertIsDisplayed().performClick()
-        compose.runOnIdle { assertEquals(3L, openedTask) }
+        compose.onNodeWithText("腰").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(4L, openedTask) }
     }
     @Test fun injectedClockAndZoneShowTodaysCompletionOnListAndDetail() {
         val clock = Clock.fixed(Instant.parse("2030-04-03T15:30:00Z"), ZoneOffset.UTC)
