@@ -62,7 +62,7 @@ class TaskScreensTest {
                 }
             }
         }
-        val nameWidth = compose.onNodeWithText(title).fetchSemanticsNode().boundsInRoot.width
+        val nameWidth = compose.onNodeWithText(title, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.width
         assertTrue("Large text must leave at least 200dp for the task name; width was $nameWidth", nameWidth >= 200f)
         compose.onNodeWithText("完了").assertIsDisplayed()
     }
