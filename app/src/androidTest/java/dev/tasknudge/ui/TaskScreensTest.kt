@@ -1,10 +1,14 @@
 package dev.tasknudge.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.unit.dp
 import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.data.*
 import kotlinx.coroutines.CompletableDeferred
@@ -22,6 +26,25 @@ class TaskScreensTest {
     @get:Rule val compose = createComposeRule()
     private fun launch(repo: ScreenRepository, enabled: Boolean = true, initial: Long? = null, enable: () -> Unit = {}) {
         compose.setContent { TaskNudgeTheme(dynamicColor = false) { TaskNudgeApp(repo, enabled, enable, initial) } }
+    }
+    @Test fun threeTasksRemainVisibleWithoutScrollingInACompactList() {
+        val tasks = listOf(
+            sampleTask(),
+            sampleTask().copy(id = 2, title = "肩"),
+            sampleTask().copy(id = 3, title = "足"),
+        )
+        var openedTask: Long? = null
+        compose.setContent {
+            TaskNudgeTheme(dynamicColor = false) {
+                Box(Modifier.size(360.dp, 560.dp)) {
+                    TaskListScreen(tasks, false, {}, true, false, {}, false,
+                        Instant.parse("2026-10-01T10:00:00Z"), ZoneId.of("Asia/Tokyo"),
+                        { openedTask = it }, {})
+                }
+            }
+        }
+        compose.onNodeWithText("足").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(3L, openedTask) }
     }
     @Test fun injectedClockAndZoneShowTodaysCompletionOnListAndDetail() {
         val clock = Clock.fixed(Instant.parse("2030-04-03T15:30:00Z"), ZoneOffset.UTC)
