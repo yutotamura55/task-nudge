@@ -5,7 +5,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import dev.tasknudge.data.TaskSnapshot
@@ -33,10 +35,9 @@ fun TaskListScreen(
 ) {
     val today = now.atZone(zone).toLocalDate()
     val active = tasks.filterNot { it.archived }
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
-            Text("今日の完了 ${active.count { task -> task.completions.any { it.localDate == today } }} / ${active.size}", style = MaterialTheme.typography.headlineSmall)
-            Text("小さな行動を、自分のペースで。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("今日の完了 ${active.count { task -> task.completions.any { it.localDate == today } }} / ${active.size}", style = MaterialTheme.typography.titleLarge)
         }
         if (!notificationsEnabled) item {
             NotificationNotice(permissionRequested, onEnableNotifications)
@@ -54,11 +55,15 @@ fun TaskListScreen(
         }
         items(visible, key = { it.id }) { task ->
             Card(onClick = { onOpenTask(task.id) }, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(task.title, style = MaterialTheme.typography.titleLarge)
-                    Text(taskStatus(task, now, zone), color = MaterialTheme.colorScheme.primary)
-                    val latest = task.completions.maxByOrNull { it.completedAt }?.localDate
-                    Text("完了 ${task.completions.size}回・最終 ${latest ?: "未実行"}", style = MaterialTheme.typography.bodyMedium)
+                Row(
+                    Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        Text(taskStatus(task, now, zone), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        Text("完了 ${task.completions.size}回", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                     if (!task.archived) {
                         TextButton(onClick = { onComplete(task.id) }, enabled = !saving && task.completions.none { it.localDate == today }) {
                             Text(if (task.completions.any { it.localDate == today }) "今日完了済み" else "完了")
