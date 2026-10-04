@@ -95,3 +95,22 @@ source `6d4db8f` のPR CI `36963062421`・push CI `36963059186` はともにSUCC
 
 - 初回PR CI `37127025722` は単体102件・端末25件が失敗/error/skipなし。同時push CI `37127023082` は既存`notificationTapRoutesToDetailOnColdAndExistingActivity`で送信直後のOS通知一覧が空となり、0.075秒で失敗。同じ通知ID・対象taskIdの通知が現れることを上限10秒で待ってから取得するようテストだけを修正し、再検証する。
 - OS通知反映待ちの変更も同じ別コンテキストreviewerで読み取り専用レビューし、重大な指摘なし。`scripts/check.sh`再実行成功。本体APKの変更はなく、実機に残した版の製品コードと一致する。
+
+- 修正後PR CI `37128318846` は端末25件すべて成功したが、同時push CI `37128317068`で別の既存通知テスト`ReminderSmokeTest.completeActionPersistsOnceAndOldActionCannotClearNewReminder`が同じOS反映前取得で失敗。取得責務を再確認し、テスト用`awaitActiveReminder()`へ集約。DBで確定したactiveTokenとOS通知ID/tokenの一致を上限10秒で待ち、取得した同じ通知を返す。送信直後の全取得箇所と保留後の再通知件数確認をこの境界に揃えた。本体エンジン・通知実装は変更なし。
+- 共通処理への修正も別コンテキストreviewerが読み取り専用でレビューし、重大な指摘なし。`scripts/check.sh`成功。再push前に変更した通知テスト全件と15分設定を実機で実行する。
+
+
+### 再開チェックポイント（2026-10-04）
+
+- branch `feat/4-fifteen-minute-interval`、HEAD `c6624c9`、PR #6 OPEN/main。追加通知テスト修正は未コミット・未push。
+- 再開時の実機4件では通知完了・保留2件成功、画面階層取得と通知欄探索で2件失敗。通常画面起動後の再実行では15分設定が成功、通知欄タップは探索タイムアウト。ログはローカル `/tmp/task-nudge-issue4-device/resumed-tests.txt` と `resumed-ui-tests.txt`。
+- 前回の実機ログで直接PendingIntent.sendがBAL_BLOCKとなることを確認したため、SystemUI通知欄で実際にタップするテストへ変更した。取得する通知は共通処理でDB世代tokenと照合する。これらの変更は読み取り専用追加レビュー済み（重大な指摘なし）、停止前の` scripts/check.sh`成功。
+- 通知欄を開くコマンド結果・root package・対象要素数だけを記録する一時診断を追加。`:app:assembleDebugAndroidTest`成功後、端末 `13091JECB06948` がADB一覧から消え、診断APKのインストールが実行できなかった。
+- 次の操作: USB再接続・画面ロック解除を確認→診断APKを導入→通知欄の実階層を確認→一時診断を除去して必要な修正→変更した全通知テストと15分設定を実機検証→必須check/追加レビュー→commit/push→両CI結果確認。実機検証前のpushはしない。個人データ・バックアップは引き続きローカルのみ。
+
+### 再接続後の最終検証（2026-10-04）
+
+- 通知操作はAndroidX UI Automator 2.3.0（androidTestのみ）で実際のSystemUI通知をタップする。2回目の探索ではアプリ内の同名タイトルも対象になっていたため、`By.pkg("com.android.systemui").text(title)`に限定。待機追加とキャッシュ消去の試行では解消せず、キャッシュ消去は最終実装に含めない。一時診断・画像保存は除去した。
+- Pixel 4a (5G) / Android 14で関連4件すべて成功（通知完了、保留、cold/existing Activityへの通知タップ、15分保存・再表示・再生成）。既存DBはテスト前後で14タスク・21完了履歴・設定1行の全レコード一致。通常アプリ画面へ戻した。
+- 最終` scripts/check.sh`成功（単体102件の既存成功結果、lint、debug/test APK生成）。`git diff --check`成功。
+- 全差分を別コンテキストCodex reviewerが読み取り専用で最終レビュー。重大な指摘なし。Gemini quota制限による代替を継続。本体の通知処理に変更なし。実機確認とレビュー後にPRへpushし、両CI結果をPR本文へ記録する。

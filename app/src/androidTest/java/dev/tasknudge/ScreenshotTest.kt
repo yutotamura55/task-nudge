@@ -10,6 +10,9 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.reminders.AndroidNotificationGateway
 import java.io.File
@@ -141,17 +144,12 @@ class ScreenshotTest {
         app.container.repository.saveSettings(ReminderSettings(0, 24, 30))
         val taskId = app.container.repository.saveTask(null, "通知から開く", 1)
         app.container.engine.evaluate()
-        val notificationManager = app.getSystemService(NotificationManager::class.java)
-        compose.waitUntil(10_000) {
-            notificationManager.activeNotifications.any {
-                it.id == AndroidNotificationGateway.NOTIFICATION_ID && it.notification.extras.getLong("taskId") == taskId
-            }
-        }
-        val notification = notificationManager.activeNotifications.single { it.id == AndroidNotificationGateway.NOTIFICATION_ID }
+        val notification = app.awaitActiveReminder()
+        val originalAccessibilityFlags = instrumentation.uiAutomation.serviceInfo.flags
         val monitor = instrumentation.addMonitor(MainActivity::class.java.name, null, false)
         var activity: MainActivity? = null
         try {
-            notification.notification.contentIntent.send()
+            tapReminderNotification("通知から開く")
             activity = instrumentation.waitForMonitorWithTimeout(monitor, 10_000) as? MainActivity
             assertNotNull("Notification tap should launch MainActivity", activity)
             compose.waitUntil(10_000) { compose.onAllNodesWithText("タスクの詳細").fetchSemanticsNodes().isNotEmpty() }
@@ -159,14 +157,29 @@ class ScreenshotTest {
             scrollToVisibleText("実行履歴（0回）")
             compose.onNodeWithContentDescription("戻る").performClick()
             waitForAddFabVisible()
-            notification.notification.contentIntent.send()
+            tapReminderNotification("通知から開く")
             compose.waitUntil(10_000) { compose.onAllNodesWithText("タスクの詳細").fetchSemanticsNodes().isNotEmpty() }
             scrollToVisibleText("実行履歴（0回）")
             assertEquals(taskId, notification.notification.extras.getLong("taskId"))
         } finally {
             activity?.runOnUiThread { activity?.finish() }
             instrumentation.removeMonitor(monitor)
+            shell("cmd statusbar collapse")
+            instrumentation.uiAutomation.serviceInfo = instrumentation.uiAutomation.serviceInfo.apply {
+                flags = originalAccessibilityFlags
+            }
         }
+    }
+
+    private fun tapReminderNotification(title: String) {
+        val device = UiDevice.getInstance(instrumentation)
+        assertTrue("Notification shade should open", device.openNotification())
+        device.waitForIdle()
+        val notification = device.wait(
+            Until.findObject(By.pkg("com.android.systemui").text(title)), 10_000,
+        )
+        assertNotNull("Notification text should be visible", notification)
+        requireNotNull(notification).click()
     }
 
     private fun capture(name: String) {
