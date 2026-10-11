@@ -33,7 +33,7 @@ fun SettingsScreen(settings: ReminderSettings, permissionRequested: Boolean, not
         state.settingsError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("settingsError")) }
         Button(onClick = { onSave(start, end, interval) }, enabled = state.canSubmit, modifier = Modifier.fillMaxWidth()) { Text(if (state.saving) "保存中…" else if (!state.canSubmit) "保存済み" else "保存") }
         HorizontalDivider()
-        Text("通知は端末の状態により遅れることがあります。保留は1時間です。強制停止後は、アプリを開くと通知を再開します。")
+        Text("通知は端末の状態により遅れることがあります。保留は24時間です。強制停止後は、アプリを開くと通知を再開します。")
         Text("データはこの端末内にのみ保存します。クラウド保存・端末移行・エクスポートには対応していません。アプリを削除すると記録も失われます。", style = MaterialTheme.typography.bodyMedium)
     }
 }
