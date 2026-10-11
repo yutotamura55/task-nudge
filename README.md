@@ -27,7 +27,7 @@ Android 13 以上では、明示的に「通知を有効にする」を押した
 
 ## 画面
 
-[API 35 エミュレーターの CI 実行](https://github.com/yutotamura55/task-nudge/actions/runs/36952478562)で撮影し、原寸で確認した実画面です。
+[API 35 エミュレーターの CI 実行](https://github.com/yutotamura55/task-nudge/actions/runs/37108961651)で撮影し、原寸で確認した実画面です。一覧では各タスクの状態と累計完了回数を短い行で確認でき、行を開くと最終完了日を含む履歴を見られます。
 
 | タスク一覧 | 完了履歴 | 通知設定 |
 | --- | --- | --- |
