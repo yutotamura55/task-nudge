@@ -14,6 +14,7 @@ import kotlinx.coroutines.sync.withLock
 class ReminderEngine(private val database: TaskDatabase, private val clock: Clock = Clock.systemUTC(), private val zoneProvider: () -> ZoneId = { ZoneId.systemDefault() }, private val gateway: NotificationGateway, private val scheduler: ReminderScheduler) {
     private val mutex = Mutex()
     private val dao = database.dao()
+    private val snoozeDuration = Duration.ofDays(1)
     val repository: TaskRepository = object : TaskRepository {
         override val snapshots = combine(dao.observeTasks(), dao.observeSettings()) { tasks, settings -> AppSnapshot(tasks.map { it.snapshot() }, settings.core(), settings.permissionRequested) }
         override suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int): Long {
@@ -109,7 +110,7 @@ class ReminderEngine(private val database: TaskDatabase, private val clock: Cloc
                 ReminderAction.COMPLETE -> complete(taskId)
                 ReminderAction.SNOOZE, ReminderAction.DISMISS -> {
                     val task = requireNotNull(dao.task(taskId))
-                    dao.updateTask(task.copy(snoozedUntil = clock.instant().plus(Duration.ofHours(1)).toEpochMilli()))
+                    dao.updateTask(task.copy(snoozedUntil = clock.instant().plus(snoozeDuration).toEpochMilli()))
                 }
             }
             // A matching action proves delivery even if deleteIntent has already
@@ -135,7 +136,7 @@ class ReminderEngine(private val database: TaskDatabase, private val clock: Cloc
         val task = state.activeTaskId?.let { dao.taskWithCompletions(it) }
         val valid = isActiveValid(state, task, now, zone, today, dao.settings().core())
         // Date/hour/task invalidation precedes missing-notification recovery: yesterday
-        // or an archived task must never acquire a new one-hour snooze.
+        // or an archived task must never acquire a new snooze.
         if (!valid || !gateway.canNotify()) {
             database.withTransaction { dao.saveState(state.cleared()) }
             if (osToken != null) gateway.cancel()
@@ -147,7 +148,7 @@ class ReminderEngine(private val database: TaskDatabase, private val clock: Cloc
         } else {
             database.withTransaction {
                 if (osToken == null && state.deliveredAt != null) {
-                    dao.updateTask(requireNotNull(task).task.copy(snoozedUntil = now.plus(Duration.ofHours(1)).toEpochMilli()))
+                    dao.updateTask(requireNotNull(task).task.copy(snoozedUntil = now.plus(snoozeDuration).toEpochMilli()))
                 }
                 dao.saveState(state.cleared())
             }

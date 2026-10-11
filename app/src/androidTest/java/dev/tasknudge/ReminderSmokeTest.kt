@@ -61,22 +61,22 @@ class ReminderSmokeTest {
         assertEquals(1, dao.taskWithCompletions(first)?.completions?.size)
     }
 
-    @Test fun snoozeActionDefersForOneHourAndDuplicateDoesNotExtendIt() = runBlocking {
+    @Test fun snoozeActionDefersForOneDayAndDuplicateDoesNotExtendIt() = runBlocking {
         val taskId = app.container.repository.saveTask(null, "背筋を伸ばす", 1)
         app.container.engine.evaluate()
         val original = app.awaitActiveReminder()
         val snooze = original.notification.actions.first { it.title.toString() == "保留" }.actionIntent
-        val expectedUntil = app.fixedClock.instantValue.plus(Duration.ofHours(1)).toEpochMilli()
+        val expectedUntil = app.fixedClock.instantValue.plus(Duration.ofDays(1)).toEpochMilli()
         snooze.send()
         snooze.send()
         await { dao.task(taskId)?.snoozedUntil == expectedUntil && activeReminderCount() == 0 }
         assertEquals(expectedUntil, dao.task(taskId)?.snoozedUntil)
         assertTrue(dao.taskWithCompletions(taskId)?.completions.isNullOrEmpty())
 
-        app.fixedClock.instantValue = app.fixedClock.instantValue.plus(Duration.ofMinutes(31))
+        app.fixedClock.instantValue = app.fixedClock.instantValue.plus(Duration.ofHours(23)).plus(Duration.ofMinutes(59))
         app.container.engine.evaluate()
         assertEquals(0, activeReminderCount())
-        app.fixedClock.instantValue = app.fixedClock.instantValue.plus(Duration.ofMinutes(30))
+        app.fixedClock.instantValue = app.fixedClock.instantValue.plus(Duration.ofMinutes(1))
         app.container.engine.evaluate()
         val resumed = app.awaitActiveReminder()
         assertEquals(1, activeReminderCount())

@@ -72,12 +72,22 @@ class ReminderEngineTest {
         assertNull(db.dao().state().lastNotifiedAt)
         gateway.failure = null; engine.evaluate(); assertNotNull(gateway.visibleToken)
     }
-    @Test fun swipeSnoozesOneHourAndDueSnoozeOutranksNormal() = runTest {
+    @Test fun swipeSnoozesOneDayAndDueSnoozeOutranksNormal() = runTest {
         val id = repo.saveTask(null, "首"); engine.evaluate()
         engine.handleAction(id, gateway.visibleToken!!, ReminderAction.DISMISS)
         assertNull(gateway.visibleToken)
-        assertEquals(clock.instant().plusSeconds(3600), repo.snapshots.first().tasks.single().snoozedUntil)
-        clock.advance(Duration.ofHours(1)); repo.saveTask(null, "腕"); engine.evaluate()
+        assertEquals(clock.instant().plusSeconds(86400), repo.snapshots.first().tasks.single().snoozedUntil)
+        clock.advance(Duration.ofDays(1)); repo.saveTask(null, "腕"); engine.evaluate()
+        assertEquals(id, gateway.taskId)
+    }
+    @Test fun notificationSnoozeExcludesTaskForOneFullDay() = runTest {
+        val id = repo.saveTask(null, "首"); engine.evaluate()
+        engine.handleAction(id, gateway.visibleToken!!, ReminderAction.SNOOZE)
+        val deadline = clock.instant().plus(Duration.ofDays(1))
+        assertEquals(deadline, repo.snapshots.first().tasks.single().snoozedUntil)
+        clock.advance(Duration.ofHours(23)); engine.evaluate()
+        assertNull(gateway.visibleToken)
+        clock.advance(Duration.ofHours(1)); engine.evaluate()
         assertEquals(id, gateway.taskId)
     }
     @Test fun existingActiveBlocksAdditionalReminder() = runTest {
@@ -138,7 +148,7 @@ class ReminderEngineTest {
     @Test fun restartDeliveredWithoutOsSnoozesTask() = runTest {
         val id = repo.saveTask(null, "首"); reserve(id, "delivered", true)
         newEngine().evaluate(); assertEquals(0, gateway.posts)
-        assertEquals(clock.instant().plusSeconds(3600), repo.snapshots.first().tasks.single().snoozedUntil)
+        assertEquals(clock.instant().plusSeconds(86400), repo.snapshots.first().tasks.single().snoozedUntil)
         assertNull(db.dao().state().activeToken)
     }
     @Test fun restartOsOnlyCancelsOldAndPostsFresh() = runTest {
@@ -157,7 +167,7 @@ class ReminderEngineTest {
         clock.advance(Duration.ofMinutes(5))
         engine.handleAction(id, "prepared", ReminderAction.DISMISS)
         assertEquals(Instant.parse("2026-10-01T01:00:00Z").toEpochMilli(), db.dao().state().lastNotifiedAt)
-        assertEquals(clock.instant().plusSeconds(3600), repo.snapshots.first().tasks.single().snoozedUntil)
+        assertEquals(clock.instant().plusSeconds(86400), repo.snapshots.first().tasks.single().snoozedUntil)
     }
     @Test fun manualEditOfPreparedVisibleReminderPreservesDeliveredCadence() = runTest {
         val id = repo.saveTask(null, "首"); reserve(id, "prepared", false); gateway.visibleToken = "prepared"
