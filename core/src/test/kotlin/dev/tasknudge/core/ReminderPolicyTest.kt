@@ -148,6 +148,13 @@ class ReminderPolicyTest {
         assertEquals(1L, ReminderPolicy.select(tasks, now, zone, settings, now.minusSeconds(1800), false))
     }
 
+    @Test fun fifteenMinuteSettingsRespectTheGlobalIntervalBoundary() {
+        val tasks = listOf(ReminderTask(1, now.minusSeconds(86400)))
+        val configured = settings.copy(intervalMinutes = 15)
+        assertNull(ReminderPolicy.select(tasks, now, zone, configured, now.minusSeconds(899), false))
+        assertEquals(1L, ReminderPolicy.select(tasks, now, zone, configured, now.minusSeconds(900), false))
+    }
+
     @Test fun sixtyAnd120MinuteSettingsChangeGlobalCadence() {
         for ((minutes, tooRecent, ready) in listOf(Triple(60, 3599L, 3600L), Triple(120, 7199L, 7200L))) {
             val configured = settings.copy(intervalMinutes = minutes)
