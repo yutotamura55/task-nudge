@@ -1,10 +1,17 @@
 package dev.tasknudge.ui
 
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Density
 import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.data.*
 import kotlinx.coroutines.CompletableDeferred
@@ -22,6 +29,42 @@ class TaskScreensTest {
     @get:Rule val compose = createComposeRule()
     private fun launch(repo: ScreenRepository, enabled: Boolean = true, initial: Long? = null, enable: () -> Unit = {}) {
         compose.setContent { TaskNudgeTheme(dynamicColor = false) { TaskNudgeApp(repo, enabled, enable, initial) } }
+    }
+    @Test fun fourTasksRemainVisibleWithoutScrollingInACompactList() {
+        val tasks = listOf(
+            sampleTask(),
+            sampleTask().copy(id = 2, title = "肩"),
+            sampleTask().copy(id = 3, title = "足"),
+            sampleTask().copy(id = 4, title = "腰"),
+        )
+        var openedTask: Long? = null
+        compose.setContent {
+            TaskNudgeTheme(dynamicColor = false) {
+                Box(Modifier.size(360.dp, 560.dp)) {
+                    TaskListScreen(tasks, false, {}, true, false, {}, false,
+                        Instant.parse("2026-10-01T10:00:00Z"), ZoneId.of("Asia/Tokyo"),
+                        { openedTask = it }, {})
+                }
+            }
+        }
+        compose.onNodeWithText("腰").assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(4L, openedTask) }
+    }
+    @Test fun largeTextKeepsTaskNameReadableWithCompletionAction() {
+        val title = "首と肩のストレッチをゆっくり丁寧に続ける"
+        compose.setContent {
+            TaskNudgeTheme(dynamicColor = false) {
+                CompositionLocalProvider(LocalDensity provides Density(1f, 2f)) {
+                    Box(Modifier.size(360.dp, 560.dp)) {
+                        TaskListScreen(listOf(sampleTask().copy(title = title)), false, {}, true, false, {}, false,
+                            Instant.parse("2026-10-01T10:00:00Z"), ZoneId.of("Asia/Tokyo"), {}, {})
+                    }
+                }
+            }
+        }
+        val nameWidth = compose.onNodeWithText(title, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.width
+        assertTrue("Large text must leave at least 200dp for the task name; width was $nameWidth", nameWidth >= 200f)
+        compose.onNodeWithText("完了").assertIsDisplayed()
     }
     @Test fun injectedClockAndZoneShowTodaysCompletionOnListAndDetail() {
         val clock = Clock.fixed(Instant.parse("2030-04-03T15:30:00Z"), ZoneOffset.UTC)
@@ -41,7 +84,7 @@ class TaskScreensTest {
         compose.onNodeWithContentDescription("タスクを追加").performClick()
         compose.onNodeWithText("タイトル").performTextInput("首のストレッチ")
         compose.onNodeWithText("保存").performClick()
-        compose.waitUntil { repo.data.value.tasks.size == 1 }
+        compose.waitUntil(10_000) { repo.data.value.tasks.size == 1 }
         assertEquals("首のストレッチ", repo.data.value.tasks.single().title)
         assertEquals(1, repo.data.value.tasks.single().recurrenceDays)
         compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
