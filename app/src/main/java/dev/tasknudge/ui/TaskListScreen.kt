@@ -5,7 +5,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import dev.tasknudge.data.TaskSnapshot
@@ -33,10 +36,9 @@ fun TaskListScreen(
 ) {
     val today = now.atZone(zone).toLocalDate()
     val active = tasks.filterNot { it.archived }
-    LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
-            Text("今日の完了 ${active.count { task -> task.completions.any { it.localDate == today } }} / ${active.size}", style = MaterialTheme.typography.headlineSmall)
-            Text("小さな行動を、自分のペースで。", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("今日の完了 ${active.count { task -> task.completions.any { it.localDate == today } }} / ${active.size}", style = MaterialTheme.typography.titleLarge)
         }
         if (!notificationsEnabled) item {
             NotificationNotice(permissionRequested, onEnableNotifications)
@@ -53,16 +55,35 @@ fun TaskListScreen(
             Text(if (tasks.isEmpty()) "まだタスクがありません。＋から、思い出したい行動を追加しましょう。" else "実行中のタスクがありません。停止中のタスクはいつでも再開できます。", style = MaterialTheme.typography.bodyLarge)
         }
         items(visible, key = { it.id }) { task ->
+            val largeText = LocalDensity.current.fontScale >= 1.5f
+            val completedToday = task.completions.any { it.localDate == today }
+            val details: @Composable (Modifier) -> Unit = { modifier ->
+                Column(modifier) {
+                    Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = if (largeText) 3 else 2, overflow = TextOverflow.Ellipsis)
+                    Text(taskStatus(task, now, zone), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    Text("完了 ${task.completions.size}回", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+            val completeAction: @Composable () -> Unit = {
+                if (!task.archived) {
+                    TextButton(onClick = { onComplete(task.id) }, enabled = !saving && !completedToday) {
+                        Text(if (completedToday) "今日完了済み" else "完了")
+                    }
+                }
+            }
             Card(onClick = { onOpenTask(task.id) }, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(task.title, style = MaterialTheme.typography.titleLarge)
-                    Text(taskStatus(task, now, zone), color = MaterialTheme.colorScheme.primary)
-                    val latest = task.completions.maxByOrNull { it.completedAt }?.localDate
-                    Text("完了 ${task.completions.size}回・最終 ${latest ?: "未実行"}", style = MaterialTheme.typography.bodyMedium)
-                    if (!task.archived) {
-                        TextButton(onClick = { onComplete(task.id) }, enabled = !saving && task.completions.none { it.localDate == today }) {
-                            Text(if (task.completions.any { it.localDate == today }) "今日完了済み" else "完了")
-                        }
+                if (largeText) {
+                    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)) {
+                        details(Modifier.fillMaxWidth())
+                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { completeAction() }
+                    }
+                } else {
+                    Row(
+                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        details(Modifier.weight(1f))
+                        completeAction()
                     }
                 }
             }
