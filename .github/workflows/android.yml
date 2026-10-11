@@ -59,6 +59,8 @@ jobs:
         with:
           packages: platform-tools
       - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
+      - name: Free space for Android emulator
+        run: sudo rm -rf /opt/hostedtoolcache/CodeQL
       - name: Enable KVM
         run: sudo chmod 666 /dev/kvm
       - uses: ReactiveCircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
@@ -66,7 +68,6 @@ jobs:
           api-level: 35
           target: google_apis
           arch: x86_64
-          disk-size: 2048M
           disable-animations: true
           script: scripts/device-smoke.sh
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
