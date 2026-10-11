@@ -10,6 +10,9 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.reminders.AndroidNotificationGateway
 import java.io.File
@@ -117,16 +120,36 @@ class ScreenshotTest {
         }
     }
 
+    @Test fun fifteenMinuteIntervalPersistsAndRemainsSelectedAfterReopening() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            waitForAddFabVisible()
+            compose.onNodeWithContentDescription("通知設定").performClick()
+            compose.onNodeWithText("15分").performScrollTo().assertIsDisplayed().performClick()
+            compose.onNodeWithText("15分").assertIsSelected()
+            compose.onNodeWithText("保存").performScrollTo().performClick()
+            compose.waitUntil(10_000) {
+                runBlocking { app.container.repository.snapshots.first().settings.intervalMinutes == 15 }
+            }
+            waitForAddFabVisible()
+            compose.onNodeWithContentDescription("通知設定").performClick()
+            compose.onNodeWithText("15分").performScrollTo().assertIsSelected()
+            scenario.recreate()
+            compose.onNodeWithText("15分").performScrollTo().assertIsDisplayed().assertIsSelected()
+            capture("settings-15-minutes")
+        }
+    }
+
     @Test fun notificationTapRoutesToDetailOnColdAndExistingActivity() = runBlocking {
         if (Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.grantRuntimePermission(app.packageName, Manifest.permission.POST_NOTIFICATIONS)
         app.container.repository.saveSettings(ReminderSettings(0, 24, 30))
         val taskId = app.container.repository.saveTask(null, "通知から開く", 1)
         app.container.engine.evaluate()
-        val notification = app.getSystemService(NotificationManager::class.java).activeNotifications.single { it.id == AndroidNotificationGateway.NOTIFICATION_ID }
+        val notification = app.awaitActiveReminder()
+        val originalAccessibilityFlags = instrumentation.uiAutomation.serviceInfo.flags
         val monitor = instrumentation.addMonitor(MainActivity::class.java.name, null, false)
         var activity: MainActivity? = null
         try {
-            notification.notification.contentIntent.send()
+            tapReminderNotification("通知から開く")
             activity = instrumentation.waitForMonitorWithTimeout(monitor, 10_000) as? MainActivity
             assertNotNull("Notification tap should launch MainActivity", activity)
             compose.waitUntil(10_000) { compose.onAllNodesWithText("タスクの詳細").fetchSemanticsNodes().isNotEmpty() }
@@ -134,14 +157,29 @@ class ScreenshotTest {
             scrollToVisibleText("実行履歴（0回）")
             compose.onNodeWithContentDescription("戻る").performClick()
             waitForAddFabVisible()
-            notification.notification.contentIntent.send()
+            tapReminderNotification("通知から開く")
             compose.waitUntil(10_000) { compose.onAllNodesWithText("タスクの詳細").fetchSemanticsNodes().isNotEmpty() }
             scrollToVisibleText("実行履歴（0回）")
             assertEquals(taskId, notification.notification.extras.getLong("taskId"))
         } finally {
             activity?.runOnUiThread { activity?.finish() }
             instrumentation.removeMonitor(monitor)
+            shell("cmd statusbar collapse")
+            instrumentation.uiAutomation.serviceInfo = instrumentation.uiAutomation.serviceInfo.apply {
+                flags = originalAccessibilityFlags
+            }
         }
+    }
+
+    private fun tapReminderNotification(title: String) {
+        val device = UiDevice.getInstance(instrumentation)
+        assertTrue("Notification shade should open", device.openNotification())
+        device.waitForIdle()
+        val notification = device.wait(
+            Until.findObject(By.pkg("com.android.systemui").text(title)), 10_000,
+        )
+        assertNotNull("Notification text should be visible", notification)
+        requireNotNull(notification).click()
     }
 
     private fun capture(name: String) {

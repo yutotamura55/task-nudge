@@ -37,7 +37,7 @@ class ReminderSmokeTest {
         val first = app.container.repository.saveTask(null, "首のストレッチ", 1)
         app.container.repository.saveTask(null, "水を飲む", 1)
         app.container.engine.evaluate()
-        val original = activeReminder()
+        val original = app.awaitActiveReminder()
         assertEquals(first, original.notification.extras.getLong("taskId"))
         assertEquals(1, activeReminderCount())
         app.container.engine.evaluate()
@@ -51,20 +51,20 @@ class ReminderSmokeTest {
 
         app.fixedClock.instantValue = app.fixedClock.instantValue.plus(Duration.ofMinutes(31))
         app.container.engine.evaluate()
-        val next = activeReminder()
+        val next = app.awaitActiveReminder()
         val nextToken = next.notification.extras.getString("token")
         assertNotEquals(original.notification.extras.getString("token"), nextToken)
         complete.send()
         // A stale receiver runs asynchronously; the current generation must survive it.
         await { dao.state().activeToken == nextToken }
-        assertEquals(nextToken, activeReminder().notification.extras.getString("token"))
+        assertEquals(nextToken, app.awaitActiveReminder().notification.extras.getString("token"))
         assertEquals(1, dao.taskWithCompletions(first)?.completions?.size)
     }
 
     @Test fun snoozeActionDefersForOneHourAndDuplicateDoesNotExtendIt() = runBlocking {
         val taskId = app.container.repository.saveTask(null, "背筋を伸ばす", 1)
         app.container.engine.evaluate()
-        val original = activeReminder()
+        val original = app.awaitActiveReminder()
         val snooze = original.notification.actions.first { it.title.toString() == "保留" }.actionIntent
         val expectedUntil = app.fixedClock.instantValue.plus(Duration.ofHours(1)).toEpochMilli()
         snooze.send()
@@ -78,12 +78,12 @@ class ReminderSmokeTest {
         assertEquals(0, activeReminderCount())
         app.fixedClock.instantValue = app.fixedClock.instantValue.plus(Duration.ofMinutes(30))
         app.container.engine.evaluate()
+        val resumed = app.awaitActiveReminder()
         assertEquals(1, activeReminderCount())
-        assertNotEquals(original.notification.extras.getString("token"), activeReminder().notification.extras.getString("token"))
+        assertNotEquals(original.notification.extras.getString("token"), resumed.notification.extras.getString("token"))
     }
 
     private fun activeReminderCount(): Int = manager.activeNotifications.count { it.id == AndroidNotificationGateway.NOTIFICATION_ID }
-    private fun activeReminder() = manager.activeNotifications.single { it.id == AndroidNotificationGateway.NOTIFICATION_ID }
     private suspend fun await(condition: suspend () -> Boolean) {
         withTimeout(10_000) { while (!condition()) delay(50) }
     }
