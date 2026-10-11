@@ -158,7 +158,7 @@ class TaskViewModelTest {
     }
     @Test fun settingsAcceptEndOfDayAndRejectInvalidHoursAndIntervals() = runTest(dispatcher) {
         val repo = FakeRepository(); val vm = TaskViewModel(repo)
-        for ((start, end, interval) in listOf(Triple("-1", "21", 30), Triple("24", "24", 30), Triple("9", "0", 30), Triple("9", "25", 30), Triple("21", "9", 30), Triple("no", "21", 30), Triple("9", "21", 15))) {
+        for ((start, end, interval) in listOf(Triple("-1", "21", 30), Triple("24", "24", 30), Triple("9", "0", 30), Triple("9", "25", 30), Triple("21", "9", 30), Triple("no", "21", 30), Triple("9", "21", 16))) {
             vm.saveSettings(start, end, interval); runCurrent()
             assertNotNull(vm.state.value.settingsError)
         }

@@ -13,6 +13,6 @@ fun validateSettings(settings: ReminderSettings): ReminderSettings {
     require(settings.startHour in 0..23) { "Start hour must be 0 to 23" }
     require(settings.endHour in 1..24) { "End hour must be 1 to 24" }
     require(settings.startHour < settings.endHour) { "Start must precede end" }
-    require(settings.intervalMinutes in listOf(30, 60, 120)) { "Unsupported notification interval" }
+    require(settings.intervalMinutes in listOf(15, 30, 60, 120)) { "Unsupported notification interval" }
     return settings
 }

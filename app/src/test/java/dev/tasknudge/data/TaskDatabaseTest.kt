@@ -75,14 +75,14 @@ class TaskDatabaseTest {
             try {
                 val repo = ReminderEngine(stored, gateway = SilentGateway(), scheduler = SilentScheduler()).repository
                 val id = repo.saveTask(null, "腰", 3); repo.completeTask(id)
-                repo.saveSettings(ReminderSettings(8, 23, 120)); repo.recordPermissionRequest()
+                repo.saveSettings(ReminderSettings(8, 23, 15)); repo.recordPermissionRequest()
             } finally { stored.close() }
             stored = open()
             try {
                 val snapshot = ReminderEngine(stored, gateway = SilentGateway(), scheduler = SilentScheduler()).repository.snapshots.first()
                 assertEquals("腰", snapshot.tasks.single().title)
                 assertEquals(1, snapshot.tasks.single().completions.size)
-                assertEquals(ReminderSettings(8, 23, 120), snapshot.settings)
+                assertEquals(ReminderSettings(8, 23, 15), snapshot.settings)
                 assertTrue(snapshot.permissionRequested)
             } finally { stored.close() }
         } finally { context.deleteDatabase(name) }
