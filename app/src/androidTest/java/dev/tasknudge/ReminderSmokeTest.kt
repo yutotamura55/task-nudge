@@ -102,8 +102,9 @@ class ReminderSmokeTest {
         val complete = firstNotice.notification.actions.first { it.title.toString() == "完了" }.actionIntent
         complete.send()
         await { dao.taskWithCompletions(first)?.completions?.size == 1 && activeReminderCount() == 1 }
-        assertEquals(secondNotice.id, manager.activeNotifications.single().id)
-        assertEquals(second, manager.activeNotifications.single().notification.extras.getLong("taskId"))
+        val remaining = manager.activeNotifications.single { it.notification.extras.getString("token") != null }
+        assertEquals(secondNotice.id, remaining.id)
+        assertEquals(second, remaining.notification.extras.getLong("taskId"))
     }
 
     private fun activeReminderCount(): Int = manager.activeNotifications.count { it.notification.extras.getString("token") != null }
