@@ -31,7 +31,7 @@ class DeviceTestApplication : TaskNudgeApplication() {
     }
 
     fun resetFixture(notificationsEnabled: Boolean = true) {
-        if (database != null) container.notificationGateway.cancel()
+        if (database != null) container.notificationGateway.activeTokens().keys.forEach(container.notificationGateway::cancel)
         database?.close()
         fixedClock.instantValue = Instant.parse("2026-10-01T10:00:00Z")
         val db = Room.inMemoryDatabaseBuilder(this, TaskDatabase::class.java)
@@ -42,7 +42,7 @@ class DeviceTestApplication : TaskNudgeApplication() {
     }
 
     fun closeFixture() {
-        container.notificationGateway.cancel()
+        container.notificationGateway.activeTokens().keys.forEach(container.notificationGateway::cancel)
         database?.close()
         database = null
     }
@@ -61,14 +61,15 @@ class MutableDeviceClock private constructor(private val value: MutableInstant, 
 }
 
 private object NoopDeviceScheduler : ReminderScheduler {
-    override fun ensurePeriodicWork() = Unit
+    override fun ensureRecurringEvaluation() = Unit
     override fun requestEvaluation(delay: Duration) = Unit
+    override fun scheduleWhileIdle(at: Instant) = Unit
 }
 
 private object DisabledDeviceGateway : NotificationGateway {
     override fun canNotify() = false
-    override fun activeToken(): String? = null
+    override fun activeTokens(): Map<Int, String> = emptyMap()
     // A post while disabled means the engine ignored canNotify(); fail the test.
-    override fun post(taskId: Long, token: String, title: String): Nothing = error("Notifications are disabled in this fixture")
-    override fun cancel() = Unit
+    override fun post(notificationId: Int, taskId: Long, token: String, title: String): Nothing = error("Notifications are disabled in this fixture")
+    override fun cancel(notificationId: Int) = Unit
 }

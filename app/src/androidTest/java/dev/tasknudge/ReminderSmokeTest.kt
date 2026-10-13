@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.os.Build
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.tasknudge.core.ReminderSettings
-import dev.tasknudge.reminders.AndroidNotificationGateway
 import java.time.Duration
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -22,14 +21,14 @@ class ReminderSmokeTest {
     private val dao get() = requireNotNull(app.database).dao()
 
     @Before fun setUp() = runBlocking {
-        manager.cancel(AndroidNotificationGateway.NOTIFICATION_ID)
+        manager.cancelAll()
         if (Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.grantRuntimePermission(app.packageName, Manifest.permission.POST_NOTIFICATIONS)
         app.resetFixture()
         app.container.repository.saveSettings(ReminderSettings(0, 24, 30))
     }
 
     @After fun tearDown() {
-        manager.cancel(AndroidNotificationGateway.NOTIFICATION_ID)
+        manager.cancelAll()
         app.closeFixture()
     }
 
@@ -56,7 +55,7 @@ class ReminderSmokeTest {
         assertNotEquals(original.notification.extras.getString("token"), nextToken)
         complete.send()
         // A stale receiver runs asynchronously; the current generation must survive it.
-        await { dao.state().activeToken == nextToken }
+        await { dao.activeReminders().any { it.token == nextToken } }
         assertEquals(nextToken, app.awaitActiveReminder().notification.extras.getString("token"))
         assertEquals(1, dao.taskWithCompletions(first)?.completions?.size)
     }
@@ -83,7 +82,31 @@ class ReminderSmokeTest {
         assertNotEquals(original.notification.extras.getString("token"), resumed.notification.extras.getString("token"))
     }
 
-    private fun activeReminderCount(): Int = manager.activeNotifications.count { it.id == AndroidNotificationGateway.NOTIFICATION_ID }
+    @Test fun noticesAccumulateAcrossIntervalsAndCompletionClearsOnlyMatchingTask() = runBlocking {
+        app.container.repository.saveSettings(ReminderSettings(0, 24, 15))
+        val first = app.container.repository.saveTask(null, "首", 1)
+        val second = app.container.repository.saveTask(null, "腕", 1)
+        app.container.engine.evaluate()
+        val firstNotice = app.awaitActiveReminder()
+        assertEquals(first, firstNotice.notification.extras.getLong("taskId"))
+
+        app.fixedClock.instantValue = app.fixedClock.instantValue.plus(Duration.ofMinutes(16))
+        app.container.engine.evaluate()
+        val secondNotice = app.awaitActiveReminder()
+        await { activeReminderCount() == 2 }
+        assertEquals(second, secondNotice.notification.extras.getLong("taskId"))
+
+        app.fixedClock.instantValue = app.fixedClock.instantValue.plus(Duration.ofMinutes(16))
+        app.container.engine.evaluate()
+        await { activeReminderCount() == 3 }
+        val complete = firstNotice.notification.actions.first { it.title.toString() == "完了" }.actionIntent
+        complete.send()
+        await { dao.taskWithCompletions(first)?.completions?.size == 1 && activeReminderCount() == 1 }
+        assertEquals(secondNotice.id, manager.activeNotifications.single().id)
+        assertEquals(second, manager.activeNotifications.single().notification.extras.getLong("taskId"))
+    }
+
+    private fun activeReminderCount(): Int = manager.activeNotifications.count { it.notification.extras.getString("token") != null }
     private suspend fun await(condition: suspend () -> Boolean) {
         withTimeout(10_000) { while (!condition()) delay(50) }
     }

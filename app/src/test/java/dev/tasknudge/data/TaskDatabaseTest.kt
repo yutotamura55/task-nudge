@@ -69,7 +69,7 @@ class TaskDatabaseTest {
         val context = RuntimeEnvironment.getApplication()
         val name = "task2-persistence.db"
         context.deleteDatabase(name)
-        fun open() = Room.databaseBuilder(context, TaskDatabase::class.java, name).addCallback(TaskDatabase.initializeDefaults).allowMainThreadQueries().build()
+        fun open() = Room.databaseBuilder(context, TaskDatabase::class.java, name).addMigrations(TaskDatabase.MIGRATION_1_2).addCallback(TaskDatabase.initializeDefaults).allowMainThreadQueries().build()
         try {
             var stored = open()
             try {
@@ -87,6 +87,35 @@ class TaskDatabaseTest {
             } finally { stored.close() }
         } finally { context.deleteDatabase(name) }
     }
+    @Test fun versionOneDatabaseKeepsTaskAndVisibleNotificationDuringUpgrade() = runTest {
+        val context = RuntimeEnvironment.getApplication()
+        val name = "task-nudge-migration-1-2.db"
+        context.deleteDatabase(name)
+        val old = context.openOrCreateDatabase(name, Application.MODE_PRIVATE, null)
+        try {
+            old.execSQL("CREATE TABLE tasks (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, title TEXT NOT NULL, recurrenceDays INTEGER NOT NULL, createdAt INTEGER NOT NULL, archived INTEGER NOT NULL, snoozedUntil INTEGER)")
+            old.execSQL("CREATE TABLE completions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, taskId INTEGER NOT NULL, completedAt INTEGER NOT NULL, localDate TEXT NOT NULL, FOREIGN KEY(taskId) REFERENCES tasks(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+            old.execSQL("CREATE INDEX index_completions_taskId ON completions (taskId)")
+            old.execSQL("CREATE UNIQUE INDEX index_completions_taskId_localDate ON completions (taskId, localDate)")
+            old.execSQL("CREATE TABLE reminder_state (id INTEGER NOT NULL, activeTaskId INTEGER, activeToken TEXT, activeLocalDate TEXT, preparedAt INTEGER, deliveredAt INTEGER, lastNotifiedAt INTEGER, PRIMARY KEY(id))")
+            old.execSQL("CREATE TABLE reminder_settings (id INTEGER NOT NULL, startHour INTEGER NOT NULL, endHour INTEGER NOT NULL, intervalMinutes INTEGER NOT NULL, permissionRequested INTEGER NOT NULL, PRIMARY KEY(id))")
+            old.execSQL("INSERT INTO tasks VALUES (7, '首', 1, 100, 0, NULL)")
+            old.execSQL("INSERT INTO reminder_state VALUES (1, 7, 'old-token', '2026-10-01', 200, 200, 200)")
+            old.execSQL("INSERT INTO reminder_settings VALUES (1, 9, 21, 15, 1)")
+            old.version = 1
+        } finally { old.close() }
+        try {
+            val upgraded = Room.databaseBuilder(context, TaskDatabase::class.java, name)
+                .addMigrations(TaskDatabase.MIGRATION_1_2).allowMainThreadQueries().build()
+            try {
+                assertEquals("首", upgraded.dao().task(7)?.title)
+                assertEquals(15, upgraded.dao().settings().intervalMinutes)
+                assertEquals(200L, upgraded.dao().state().lastNotifiedAt)
+                assertEquals("old-token", upgraded.dao().activeReminders().single().token)
+                assertEquals(1, upgraded.dao().activeReminders().single().notificationId)
+            } finally { upgraded.close() }
+        } finally { context.deleteDatabase(name) }
+    }
     @Test fun settingsAndPermissionPersistAcrossEngineRecreation() = runTest {
         repository.saveSettings(ReminderSettings(8, 23, 60)); repository.recordPermissionRequest()
         val reloaded = ReminderEngine(db, gateway = SilentGateway(), scheduler = SilentScheduler()).repository.snapshots.first()
@@ -96,11 +125,12 @@ class TaskDatabaseTest {
 }
 private class SilentGateway : NotificationGateway {
     override fun canNotify() = false
-    override fun activeToken(): String? = null
-    override fun post(taskId: Long, token: String, title: String) = Unit
-    override fun cancel() = Unit
+    override fun activeTokens(): Map<Int, String> = emptyMap()
+    override fun post(notificationId: Int, taskId: Long, token: String, title: String) = Unit
+    override fun cancel(notificationId: Int) = Unit
 }
 private class SilentScheduler : ReminderScheduler {
-    override fun ensurePeriodicWork() = Unit
+    override fun ensureRecurringEvaluation() = Unit
     override fun requestEvaluation(delay: Duration) = Unit
+    override fun scheduleWhileIdle(at: Instant) = Unit
 }

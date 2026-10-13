@@ -35,7 +35,59 @@ class ReminderEngineTest {
         repo.saveTask(null, "首")
         coroutineScope { repeat(10) { launch(Dispatchers.Default) { engine.evaluate() } } }
         assertEquals(1, gateway.posts)
-        assertNotNull(db.dao().state().deliveredAt)
+        assertNotNull(db.dao().activeReminders().single().deliveredAt)
+    }
+    @Test fun ignoredReminderDoesNotBlockLaterIntervals() = runTest {
+        repo.saveSettings(ReminderSettings(0, 24, 15))
+        repo.saveTask(null, "首")
+        repeat(4) {
+            engine.evaluate()
+            clock.advance(Duration.ofMinutes(15))
+        }
+        assertEquals(4, gateway.posts)
+    }
+    @Test fun unnotifiedTaskGetsNextIntervalBeforeRepeatingFirst() = runTest {
+        repo.saveSettings(ReminderSettings(0, 24, 15))
+        val first = repo.saveTask(null, "首")
+        val second = repo.saveTask(null, "腕")
+        engine.evaluate()
+        assertEquals(first, gateway.taskId)
+        clock.advance(Duration.ofMinutes(15))
+        engine.evaluate()
+        assertEquals(second, gateway.taskId)
+    }
+    @Test fun evaluationSchedulesTheNextNotificationOpportunity() = runTest {
+        repo.saveSettings(ReminderSettings(9, 21, 15))
+        repo.saveTask(null, "首")
+        engine.evaluate()
+        assertEquals(clock.instant().plus(Duration.ofMinutes(15)), scheduler.nextAlarm)
+        clock.advance(Duration.ofHours(12))
+        engine.evaluate()
+        assertEquals(Instant.parse("2026-10-02T00:00:00Z"), scheduler.nextAlarm)
+    }
+    @Test fun oneDelayedEvaluationDoesNotBackfillMissedIntervals() = runTest {
+        repo.saveSettings(ReminderSettings(0, 24, 15))
+        repo.saveTask(null, "首")
+        engine.evaluate()
+        clock.advance(Duration.ofHours(3))
+        engine.evaluate()
+        assertEquals(2, gateway.posts)
+    }
+    @Test fun completingOneOfSeveralRemindersClearsOnlyThatTask() = runTest {
+        repo.saveSettings(ReminderSettings(0, 24, 15))
+        val first = repo.saveTask(null, "首")
+        val second = repo.saveTask(null, "腕")
+        engine.evaluate()
+        val firstToken = gateway.visibleToken!!
+        clock.advance(Duration.ofMinutes(15)); engine.evaluate()
+        val secondToken = gateway.visibleToken!!
+        clock.advance(Duration.ofMinutes(15)); engine.evaluate()
+        assertEquals(3, gateway.activeCount)
+        engine.handleAction(first, firstToken, ReminderAction.COMPLETE)
+        assertEquals(1, gateway.activeCount)
+        assertEquals(secondToken, gateway.visibleToken)
+        assertEquals(1, repo.snapshots.first().tasks.first { it.id == first }.completions.size)
+        assertTrue(repo.snapshots.first().tasks.first { it.id == second }.completions.isEmpty())
     }
     @Test fun concurrentCompletionsRecordOneDay() = runTest {
         val id = repo.saveTask(null, "首")
@@ -56,13 +108,13 @@ class ReminderEngineTest {
     @Test fun permissionDenialDoesNotConsumeCadence() = runTest {
         repo.saveTask(null, "首"); gateway.allowed = false; engine.evaluate()
         assertNull(db.dao().state().lastNotifiedAt)
-        assertNull(db.dao().state().activeToken)
+        assertTrue(db.dao().activeReminders().isEmpty())
         gateway.allowed = true; engine.evaluate()
         assertEquals(1, gateway.posts)
     }
     @Test fun postFailureClearsReservationAndRetries() = runTest {
         repo.saveTask(null, "首"); gateway.failure = SecurityException("denied"); engine.evaluate()
-        assertNull(db.dao().state().activeToken); assertNull(db.dao().state().lastNotifiedAt)
+        assertTrue(db.dao().activeReminders().isEmpty()); assertNull(db.dao().state().lastNotifiedAt)
         gateway.failure = null; engine.evaluate()
         assertNotNull(gateway.visibleToken)
         assertEquals(clock.millis(), db.dao().state().lastNotifiedAt)
@@ -90,21 +142,22 @@ class ReminderEngineTest {
         clock.advance(Duration.ofHours(1)); engine.evaluate()
         assertEquals(id, gateway.taskId)
     }
-    @Test fun existingActiveBlocksAdditionalReminder() = runTest {
+    @Test fun existingActiveDoesNotBlockAdditionalReminder() = runTest {
         repo.saveTask(null, "首"); engine.evaluate(); val token = gateway.visibleToken
         clock.advance(Duration.ofHours(1)); repo.saveTask(null, "腕"); engine.evaluate()
-        assertEquals(token, gateway.visibleToken); assertEquals(1, gateway.posts)
+        assertNotEquals(token, gateway.visibleToken); assertEquals(2, gateway.posts)
+        assertEquals(2, gateway.activeCount)
     }
     @Test fun midnightInvalidatesActiveBeforeMissingOsSnooze() = runTest {
         val id = repo.saveTask(null, "首"); engine.evaluate(); gateway.visibleToken = null
         clock.advance(Duration.ofHours(14)); engine.evaluate()
-        assertNull(db.dao().state().activeToken)
+        assertTrue(db.dao().activeReminders().isEmpty())
         assertNull(repo.snapshots.first().tasks.first { it.id == id }.snoozedUntil)
     }
     @Test fun quietHoursInvalidateActive() = runTest {
         repo.saveTask(null, "首"); engine.evaluate()
         repo.saveSettings(ReminderSettings(11, 21, 30)); engine.evaluate()
-        assertNull(gateway.visibleToken); assertNull(db.dao().state().activeToken)
+        assertNull(gateway.visibleToken); assertTrue(db.dao().activeReminders().isEmpty())
     }
     @Test fun matchingEditsArchiveAndManualCompletionInvalidateNotification() = runTest {
         val id = repo.saveTask(null, "首"); engine.evaluate()
@@ -147,9 +200,13 @@ class ReminderEngineTest {
     }
     @Test fun restartDeliveredWithoutOsSnoozesTask() = runTest {
         val id = repo.saveTask(null, "首"); reserve(id, "delivered", true)
+        clock.advance(Duration.ofMinutes(4))
+        newEngine().evaluate()
+        assertNull(repo.snapshots.first().tasks.single().snoozedUntil)
+        clock.advance(Duration.ofMinutes(1).plusSeconds(1))
         newEngine().evaluate(); assertEquals(0, gateway.posts)
         assertEquals(clock.instant().plusSeconds(86400), repo.snapshots.first().tasks.single().snoozedUntil)
-        assertNull(db.dao().state().activeToken)
+        assertTrue(db.dao().activeReminders().isEmpty())
     }
     @Test fun restartOsOnlyCancelsOldAndPostsFresh() = runTest {
         repo.saveTask(null, "首"); gateway.visibleToken = "orphan"
@@ -182,7 +239,7 @@ class ReminderEngineTest {
         engine.handleAction(id, old, ReminderAction.COMPLETE)
         assertTrue(repo.snapshots.first().tasks.single().completions.isEmpty())
         assertNull(gateway.visibleToken)
-        assertNull(db.dao().state().activeToken)
+        assertTrue(db.dao().activeReminders().isEmpty())
     }
     @Test fun timezoneSwitchPreservesCompletionDateAndUsesNewZoneForNextCompletion() = runTest {
         val id = repo.saveTask(null, "首"); repo.completeTask(id)
@@ -234,7 +291,8 @@ class ReminderEngineTest {
         assertEquals(1, repo.snapshots.first().tasks.size)
     }
     private suspend fun reserve(id: Long, token: String, delivered: Boolean) {
-        db.dao().saveState(ReminderStateEntity(activeTaskId = id, activeToken = token, activeLocalDate = "2026-10-01", preparedAt = clock.millis(), deliveredAt = if (delivered) clock.millis() else null, lastNotifiedAt = if (delivered) clock.millis() else null))
+        db.dao().insertActiveReminder(ActiveReminderEntity(taskId = id, token = token, localDate = "2026-10-01", preparedAt = clock.millis(), deliveredAt = if (delivered) clock.millis() else null))
+        if (delivered) db.dao().saveState(ReminderStateEntity(lastNotifiedAt = clock.millis()))
     }
 }
 private class MutableClock(var now: Instant = Instant.parse("2026-10-01T01:00:00Z")) : Clock() {
@@ -245,7 +303,11 @@ private class MutableClock(var now: Instant = Instant.parse("2026-10-01T01:00:00
 }
 private class FakeGateway : NotificationGateway {
     var allowed = true
-    var visibleToken: String? = null
+    private val visible = mutableMapOf<Int, String>()
+    var visibleToken: String?
+        get() = visible.values.lastOrNull()
+        set(value) { visible.clear(); if (value != null) visible[1] = value }
+    val activeCount get() = visible.size
     var posts = 0
     var cancels = 0
     var taskId: Long? = null
@@ -255,19 +317,21 @@ private class FakeGateway : NotificationGateway {
     var failReadOnCall: Int? = null
     var reads = 0
     var failCancel = false
-    override fun activeToken(): String? {
+    override fun activeTokens(): Map<Int, String> {
         reads++
         if (reads == failReadOnCall) error("notification read")
-        return visibleToken
+        return visible.toMap()
     }
-    override fun post(taskId: Long, token: String, title: String) {
-        failure?.let { throw it }; posts++; visibleToken = token; this.taskId = taskId; this.title = title
+    override fun post(notificationId: Int, taskId: Long, token: String, title: String) {
+        failure?.let { throw it }; posts++; visible[notificationId] = token; this.taskId = taskId; this.title = title
     }
-    override fun cancel() { if (failCancel) error("cancel"); cancels++; visibleToken = null }
+    override fun cancel(notificationId: Int) { if (failCancel) error("cancel"); cancels++; visible.remove(notificationId) }
 }
 private class FakeScheduler : ReminderScheduler {
     var requests = 0
     var failure: RuntimeException? = null
-    override fun ensurePeriodicWork() = Unit
+    var nextAlarm: Instant? = null
+    override fun ensureRecurringEvaluation() = Unit
     override fun requestEvaluation(delay: Duration) { requests++; failure?.let { throw it } }
+    override fun scheduleWhileIdle(at: Instant) { nextAlarm = at }
 }
