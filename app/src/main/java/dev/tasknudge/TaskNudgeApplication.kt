@@ -11,7 +11,7 @@ open class TaskNudgeApplication : Application() {
     override fun onCreate() {
         super.onCreate()
         container = AppContainer(this)
-        container.scheduler.ensurePeriodicWork()
+        container.scheduler.ensureRecurringEvaluation()
         container.scheduler.requestEvaluation()
     }
 }

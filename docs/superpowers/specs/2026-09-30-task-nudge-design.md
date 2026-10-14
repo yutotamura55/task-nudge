@@ -1,5 +1,7 @@
 # Task Nudge Android MVP 設計
 
+通知を最大1件に抑える仕様と WorkManager のみの継続通知方式は Issue #9 で変更された。現在の通知仕様は [Issue #9 の記録](../../issues/9-notification-cadence.md) を参照する。以下は当時の設計判断を残す。
+
 保存結果と画面状態の詳細な境界は、設計レビューを反映した [2026-10-01-command-boundaries.md](2026-10-01-command-boundaries.md) に従う。
 
 ## 目的と合意範囲

@@ -30,9 +30,9 @@ object ReminderPolicy {
         zone: ZoneId,
         settings: ReminderSettings,
         lastNotifiedAt: Instant?,
-        hasActiveNotification: Boolean,
+        lastNotifiedByTask: Map<Long, Instant> = emptyMap(),
     ): Long? {
-        if (!isWithinHours(now, zone, settings) || hasActiveNotification) return null
+        if (!isWithinHours(now, zone, settings)) return null
         if (lastNotifiedAt != null &&
             Duration.between(lastNotifiedAt, now) < Duration.ofMinutes(settings.intervalMinutes.toLong())
         ) return null
@@ -46,7 +46,8 @@ object ReminderPolicy {
                     (task.snoozedUntil == null || !now.isBefore(task.snoozedUntil))
             }
             .minWithOrNull(
-                compareBy<ReminderTask> { if (it.snoozedUntil != null) 0 else 1 }
+                compareBy<ReminderTask> { lastNotifiedByTask[it.id] }
+                    .thenBy { if (it.snoozedUntil != null) 0 else 1 }
                     .thenBy { it.lastCompletedAt ?: it.createdAt }
                     .thenBy { it.createdAt }
                     .thenBy { it.id },

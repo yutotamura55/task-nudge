@@ -25,12 +25,13 @@ class AndroidNotificationGatewayTest {
         manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         gateway = AndroidNotificationGateway(context)
     }
-    @Test fun fixedNotificationReplacesGenerationAndPreservesActionTokens() {
-        gateway.post(5, "old", "首")
+    @Test fun distinctNotificationsAccumulateAndPreserveActionTokens() {
+        gateway.post(1, 5, "old", "首")
         val oldDelete = manager.activeNotifications.single().notification.deleteIntent
-        gateway.post(6, "fresh", "腕")
-        val notification = manager.activeNotifications.single().notification
-        assertEquals("fresh", gateway.activeToken())
+        gateway.post(2, 6, "fresh", "腕")
+        assertEquals(2, manager.activeNotifications.size)
+        val notification = manager.activeNotifications.single { it.id == 2 }.notification
+        assertEquals(mapOf(1 to "old", 2 to "fresh"), gateway.activeTokens())
         assertEquals(Notification.VISIBILITY_PRIVATE, notification.visibility)
         assertEquals(0, notification.flags and Notification.FLAG_AUTO_CANCEL)
         assertEquals("腕", notification.extras.getCharSequence(Notification.EXTRA_TEXT))
@@ -50,7 +51,10 @@ class AndroidNotificationGatewayTest {
         val tap = shadowOf(notification.contentIntent).savedIntent
         assertEquals(6L, tap.getLongExtra("taskId", -1))
         assertEquals(MainActivity::class.java.name, tap.component!!.className)
-        gateway.cancel(); assertTrue(manager.activeNotifications.isEmpty())
+        gateway.cancel(2)
+        assertEquals(mapOf(1 to "old"), gateway.activeTokens())
+        gateway.cancel(1)
+        assertTrue(manager.activeNotifications.isEmpty())
     }
     @Test fun disabledChannelAndGlobalNotificationsAreDetected() {
         assertTrue(gateway.canNotify())
