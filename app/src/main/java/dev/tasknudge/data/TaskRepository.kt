@@ -1,6 +1,7 @@
 package dev.tasknudge.data
 
 import dev.tasknudge.core.ReminderSettings
+import dev.tasknudge.core.TaskInput
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -13,6 +14,8 @@ import kotlinx.coroutines.flow.Flow
 interface TaskRepository {
     val snapshots: Flow<AppSnapshot>
     suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int = 1): Long
+    /** Inserts all tasks in one transaction and returns their committed IDs in input order. */
+    suspend fun saveTasks(inputs: List<TaskInput>): List<Long>
     suspend fun setArchived(id: Long, archived: Boolean)
     suspend fun completeTask(id: Long)
     suspend fun saveSettings(settings: ReminderSettings)

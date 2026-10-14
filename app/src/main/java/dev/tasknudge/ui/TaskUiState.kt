@@ -15,6 +15,7 @@ data class ObservationState(
 
 sealed interface OperationResult {
     data class TaskSaved(val id: Long) : OperationResult
+    data class TasksSaved(val count: Int) : OperationResult
     data object SettingsSaved : OperationResult
     data object Updated : OperationResult
 }
@@ -32,6 +33,7 @@ data class TaskUiState(
     val observation: ObservationState = ObservationState(),
     val operation: ScreenOperation = ScreenOperation(),
     val titleError: String? = null,
+    val bulkError: String? = null,
     val recurrenceError: String? = null,
     val settingsError: String? = null,
 ) {

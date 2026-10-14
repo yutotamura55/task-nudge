@@ -3,6 +3,7 @@ package dev.tasknudge.reminders
 import android.app.Application
 import androidx.room.Room
 import dev.tasknudge.core.ReminderSettings
+import dev.tasknudge.core.TaskInput
 import dev.tasknudge.data.*
 import java.time.*
 import kotlinx.coroutines.*
@@ -31,6 +32,20 @@ class ReminderEngineTest {
     }
     private fun newEngine() = ReminderEngine(db, clock, { zone }, gateway, scheduler)
     @After fun close() { db.close() }
+    @Test fun bulkSaveCommitsEveryTaskWithOneReminderRefresh() = runTest {
+        val ids = repo.saveTasks(listOf(TaskInput("首", 3), TaskInput("腕", 3)))
+        assertEquals(2, ids.size)
+        assertEquals(listOf("首", "腕"), repo.snapshots.first().tasks.map { it.title })
+        assertEquals(listOf(3, 3), repo.snapshots.first().tasks.map { it.recurrenceDays })
+        assertEquals(1, scheduler.requests)
+    }
+    @Test fun bulkSaveRollsBackWhenAnInsertFails() = runTest {
+        db.openHelper.writableDatabase.execSQL("CREATE TRIGGER reject_arm BEFORE INSERT ON tasks WHEN NEW.title = '腕' BEGIN SELECT RAISE(ABORT, 'rejected'); END")
+        try { repo.saveTasks(listOf(TaskInput("首", 1), TaskInput("腕", 1))); fail("Expected insert failure") }
+        catch (_: Exception) { }
+        assertTrue(repo.snapshots.first().tasks.isEmpty())
+        assertEquals(0, scheduler.requests)
+    }
     @Test fun concurrentEvaluationsPostOneReminder() = runTest {
         repo.saveTask(null, "首")
         coroutineScope { repeat(10) { launch(Dispatchers.Default) { engine.evaluate() } } }

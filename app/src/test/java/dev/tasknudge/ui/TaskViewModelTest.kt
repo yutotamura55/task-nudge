@@ -1,6 +1,7 @@
 package dev.tasknudge.ui
 
 import dev.tasknudge.core.ReminderSettings
+import dev.tasknudge.core.TaskInput
 import dev.tasknudge.data.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -12,6 +13,30 @@ import java.time.LocalDate
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskViewModelTest {
+    @Test fun bulkSavePassesTrimmedLinesAndOneIntervalAsOneCommand() = runTest(dispatcher) {
+        val repo = FakeRepository(); val vm = TaskViewModel(repo)
+        vm.saveTasks(" 首 \n\n 腕 ", "3"); runCurrent()
+        assertEquals(listOf(TaskInput("首", 3), TaskInput("腕", 3)), repo.bulkSaved.single())
+        assertEquals(OperationState.Committed(OperationResult.TasksSaved(2)), vm.state.value.operation.state)
+        vm.saveTasks("首\n腕", "3"); runCurrent()
+        assertEquals(1, repo.bulkSaved.size)
+    }
+    @Test fun invalidBulkInputCannotPartlyWrite() = runTest(dispatcher) {
+        val repo = FakeRepository(); val vm = TaskViewModel(repo)
+        vm.saveTasks("首\n${"長".repeat(101)}", "1"); runCurrent()
+        assertNotNull(vm.state.value.bulkError)
+        vm.saveTasks("首\n腕", "0"); runCurrent()
+        assertNotNull(vm.state.value.recurrenceError)
+        assertTrue(repo.bulkSaved.isEmpty())
+    }
+    @Test fun oldBulkSaveResultCannotReachNewScreen() = runTest(dispatcher) {
+        val repo = FakeRepository().apply { gate = CompletableDeferred() }; val vm = TaskViewModel(repo)
+        val old = vm.beginScreenSession()
+        vm.saveTasks("首\n腕", "1", old); runCurrent()
+        val current = vm.beginScreenSession()
+        repo.gate!!.complete(Unit); runCurrent()
+        assertEquals(ScreenOperation(current), vm.state.value.operation)
+    }
     private val dispatcher = StandardTestDispatcher()
     @Before fun setup() { Dispatchers.setMain(dispatcher) }
     @After fun cleanup() { Dispatchers.resetMain() }
@@ -277,6 +302,7 @@ private class FakeRepository(emitFailure: Boolean = false) : TaskRepository {
         } finally { activeSubscriptions-- }
     }
     val saved = mutableListOf<SavedInput>()
+    val bulkSaved = mutableListOf<List<TaskInput>>()
     val settings = mutableListOf<ReminderSettings>()
     var gate: CompletableDeferred<Unit>? = null
     var updateGate: CompletableDeferred<Unit>? = null
@@ -293,6 +319,12 @@ private class FakeRepository(emitFailure: Boolean = false) : TaskRepository {
         pending = task(savedId).copy(title = title, recurrenceDays = recurrenceDays)
         if (publishSaves) publishPending()
         return savedId
+    }
+    override suspend fun saveTasks(inputs: List<TaskInput>): List<Long> {
+        if (fail) error("disk")
+        gate?.await()
+        bulkSaved += inputs
+        return inputs.indices.map { it + 1L }
     }
     suspend fun publishPending() {
         val snapshot = data.replayCache.lastOrNull() ?: AppSnapshot(emptyList(), ReminderSettings(), false)
