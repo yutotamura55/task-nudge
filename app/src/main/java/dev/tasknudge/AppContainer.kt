@@ -10,9 +10,9 @@ import java.time.ZoneId
 
 class AppContainer(
     context: Context,
-    database: TaskDatabase = Room.databaseBuilder(context.applicationContext, TaskDatabase::class.java, "task-nudge.db").addCallback(TaskDatabase.initializeDefaults).build(),
+    database: TaskDatabase = Room.databaseBuilder(context.applicationContext, TaskDatabase::class.java, "task-nudge.db").addMigrations(TaskDatabase.MIGRATION_1_2).addCallback(TaskDatabase.initializeDefaults).build(),
     val notificationGateway: NotificationGateway = AndroidNotificationGateway(context.applicationContext),
-    val scheduler: ReminderScheduler = WorkManagerReminderScheduler(context.applicationContext),
+    val scheduler: ReminderScheduler = AndroidReminderScheduler(context.applicationContext),
     val clock: Clock = Clock.systemUTC(),
     val zoneProvider: () -> ZoneId = { ZoneId.systemDefault() },
 ) {

@@ -112,13 +112,13 @@ class ReminderPolicyTest {
     @Test fun springDstUsesCalendarDayEvenWhenOnly23HoursElapsed() {
         val task = ReminderTask(1, Instant.parse("2026-03-07T17:00:00Z"),
             lastCompletedAt = Instant.parse("2026-03-07T17:00:00Z"), lastCompletedDate = LocalDate.parse("2026-03-07"))
-        assertEquals(1L, ReminderPolicy.select(listOf(task), Instant.parse("2026-03-08T16:00:00Z"), ZoneId.of("America/New_York"), settings, null, false))
+        assertEquals(1L, ReminderPolicy.select(listOf(task), Instant.parse("2026-03-08T16:00:00Z"), ZoneId.of("America/New_York"), settings, null))
     }
 
     @Test fun fallDstUsesCalendarDayEvenWhen25HoursElapsed() {
         val task = ReminderTask(1, Instant.parse("2026-10-31T16:00:00Z"),
             lastCompletedAt = Instant.parse("2026-10-31T16:00:00Z"), lastCompletedDate = LocalDate.parse("2026-10-31"))
-        assertEquals(1L, ReminderPolicy.select(listOf(task), Instant.parse("2026-11-01T17:00:00Z"), ZoneId.of("America/New_York"), settings, null, false))
+        assertEquals(1L, ReminderPolicy.select(listOf(task), Instant.parse("2026-11-01T17:00:00Z"), ZoneId.of("America/New_York"), settings, null))
     }
 
     @Test fun notificationHoursIncludeStartAndExcludeEnd() {
@@ -138,38 +138,34 @@ class ReminderPolicyTest {
         assertNull(select(listOf(ReminderTask(1, now, snoozedUntil = now)), Instant.parse("2026-09-30T12:00:00Z")))
     }
 
-    @Test fun activeNotificationBlocksAnotherCandidate() {
-        assertNull(ReminderPolicy.select(listOf(ReminderTask(1, now)), now, zone, settings, null, true))
-    }
-
     @Test fun globalCadenceIncludesExactThirtyMinuteBoundary() {
         val tasks = listOf(ReminderTask(1, now))
-        assertNull(ReminderPolicy.select(tasks, now, zone, settings, now.minusSeconds(1799), false))
-        assertEquals(1L, ReminderPolicy.select(tasks, now, zone, settings, now.minusSeconds(1800), false))
+        assertNull(ReminderPolicy.select(tasks, now, zone, settings, now.minusSeconds(1799)))
+        assertEquals(1L, ReminderPolicy.select(tasks, now, zone, settings, now.minusSeconds(1800)))
     }
 
     @Test fun fifteenMinuteSettingsRespectTheGlobalIntervalBoundary() {
         val tasks = listOf(ReminderTask(1, now.minusSeconds(86400)))
         val configured = settings.copy(intervalMinutes = 15)
-        assertNull(ReminderPolicy.select(tasks, now, zone, configured, now.minusSeconds(899), false))
-        assertEquals(1L, ReminderPolicy.select(tasks, now, zone, configured, now.minusSeconds(900), false))
+        assertNull(ReminderPolicy.select(tasks, now, zone, configured, now.minusSeconds(899)))
+        assertEquals(1L, ReminderPolicy.select(tasks, now, zone, configured, now.minusSeconds(900)))
     }
 
     @Test fun sixtyAnd120MinuteSettingsChangeGlobalCadence() {
         for ((minutes, tooRecent, ready) in listOf(Triple(60, 3599L, 3600L), Triple(120, 7199L, 7200L))) {
             val configured = settings.copy(intervalMinutes = minutes)
             val tasks = listOf(ReminderTask(1, now))
-            assertNull(ReminderPolicy.select(tasks, now, zone, configured, now.minusSeconds(tooRecent), false))
-            assertEquals(1L, ReminderPolicy.select(tasks, now, zone, configured, now.minusSeconds(ready), false))
+            assertNull(ReminderPolicy.select(tasks, now, zone, configured, now.minusSeconds(tooRecent)))
+            assertEquals(1L, ReminderPolicy.select(tasks, now, zone, configured, now.minusSeconds(ready)))
         }
     }
 
     @Test fun dueSnoozeStillRespectsGlobalCadence() {
-        assertNull(ReminderPolicy.select(listOf(ReminderTask(1, now, snoozedUntil = now)), now, zone, settings, now.minusSeconds(1799), false))
+        assertNull(ReminderPolicy.select(listOf(ReminderTask(1, now, snoozedUntil = now)), now, zone, settings, now.minusSeconds(1799)))
     }
 
     @Test fun futureDeliveryTimestampDoesNotPermitNewNotification() {
-        assertNull(ReminderPolicy.select(listOf(ReminderTask(1, now)), now, zone, settings, now.plusSeconds(3600), false))
+        assertNull(ReminderPolicy.select(listOf(ReminderTask(1, now)), now, zone, settings, now.plusSeconds(3600)))
     }
 
     @Test fun noEligibleCandidateReturnsNull() {
@@ -178,5 +174,5 @@ class ReminderPolicyTest {
     }
 
     private fun select(tasks: List<ReminderTask>, at: Instant = now): Long? =
-        ReminderPolicy.select(tasks, at, zone, settings, null, false)
+        ReminderPolicy.select(tasks, at, zone, settings, null)
 }

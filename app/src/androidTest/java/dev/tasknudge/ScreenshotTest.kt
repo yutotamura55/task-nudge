@@ -31,11 +31,11 @@ class ScreenshotTest {
 
     @Before fun setUp() {
         app.resetFixture()
-        app.getSystemService(NotificationManager::class.java).cancel(AndroidNotificationGateway.NOTIFICATION_ID)
+        app.getSystemService(NotificationManager::class.java).cancelAll()
     }
 
     @After fun tearDown() {
-        app.getSystemService(NotificationManager::class.java).cancel(AndroidNotificationGateway.NOTIFICATION_ID)
+        app.getSystemService(NotificationManager::class.java).cancelAll()
         app.closeFixture()
     }
 
