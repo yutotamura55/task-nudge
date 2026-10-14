@@ -35,6 +35,16 @@ class ReminderEngine(
                 else { val task = requireNotNull(dao.task(id)) { "Unknown task" }; dao.updateTask(task.copy(title = input.title, recurrenceDays = input.recurrenceDays)); id }
             }
         }
+        override suspend fun saveTasks(inputs: List<TaskInput>): List<Long> {
+            require(inputs.size in 1..100) { "Bulk input must contain 1 to 100 tasks" }
+            val validated = inputs.map { validateTaskInput(it.title, it.recurrenceDays) }
+            return mutate(null) {
+                val createdAt = clock.millis()
+                validated.map { input ->
+                    dao.insertTask(TaskEntity(title = input.title, recurrenceDays = input.recurrenceDays, createdAt = createdAt))
+                }
+            }
+        }
         override suspend fun setArchived(id: Long, archived: Boolean) { mutate(id) { dao.task(id)?.let { dao.updateTask(it.copy(archived = archived)) } } }
         override suspend fun completeTask(id: Long) { mutate(id) { complete(id) } }
         override suspend fun saveSettings(settings: ReminderSettings) { validateSettings(settings); mutate(null) { dao.saveSettings(dao.settings().copy(startHour = settings.startHour, endHour = settings.endHour, intervalMinutes = settings.intervalMinutes)) } }

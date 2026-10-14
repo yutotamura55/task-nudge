@@ -81,6 +81,7 @@ fun TaskNudgeApp(
         if (state.operation.sessionId == sessionId && vm.state.value.operation.sessionId == sessionId) {
             when (val result = (state.operation.state as? OperationState.Committed)?.result) {
                 is OperationResult.TaskSaved -> if (screen == "editor" && snapshot?.tasks?.any { it.id == result.id } == true) navigate("detail", result.id)
+                is OperationResult.TasksSaved -> if (screen == "bulk") navigate("list", null)
                 OperationResult.SettingsSaved -> if (screen == "settings") navigate("list")
                 OperationResult.Updated -> vm.consumeOperation(sessionId)
                 null -> Unit
@@ -101,12 +102,15 @@ fun TaskNudgeApp(
         modifier = Modifier.fillMaxSize().imePadding(),
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
-            TopAppBar(title = { Text(when (screen) { "editor" -> if (selectedId == null) "タスクを追加" else "タスクを編集"; "detail" -> "タスクの詳細"; "settings" -> "通知設定"; else -> "タスク" }) },
+            TopAppBar(title = { Text(when (screen) { "editor" -> if (selectedId == null) "タスクを追加" else "タスクを編集"; "bulk" -> "まとめて追加"; "detail" -> "タスクの詳細"; "settings" -> "通知設定"; else -> "タスク" }) },
                 navigationIcon = {
                     if (screen != "list") TextButton(onClick = { backFrom(owner, shownScreen, shownTaskId) }, modifier = Modifier.semantics { contentDescription = "戻る" }) { Text("戻る") }
                 },
                 actions = {
-                    if (screen == "list") TextButton(onClick = { navigateFrom(owner, "settings", shownTaskId) }, modifier = Modifier.semantics { contentDescription = "通知設定" }) { Text("設定") }
+                    if (screen == "list") {
+                        TextButton(onClick = { navigateFrom(owner, "bulk", null) }, modifier = Modifier.semantics { contentDescription = "まとめて追加" }) { Text("まとめて追加") }
+                        TextButton(onClick = { navigateFrom(owner, "settings", shownTaskId) }, modifier = Modifier.semantics { contentDescription = "通知設定" }) { Text("設定") }
+                    }
                 })
         },
         floatingActionButton = {
@@ -134,6 +138,7 @@ fun TaskNudgeApp(
                             if (savedId != null && snapshot.tasks.none { it.id == savedId }) Text("保存済み・データ表示待ち", modifier = Modifier.padding(16.dp))
                             TaskEditorScreen(task, state) { title, recurrence -> vm.saveTask(taskId, title, recurrence, owner) }
                         }
+                        screen == "bulk" -> TaskBulkEditorScreen(state) { text, recurrence -> vm.saveTasks(text, recurrence, owner) }
                         screen == "settings" -> SettingsScreen(snapshot.settings, snapshot.permissionRequested, notificationsEnabled, state, { if (sessionId == owner) onEnableNotifications() }) { start, end, interval -> vm.saveSettings(start, end, interval, owner) }
                         screen == "detail" && task != null -> {
                             val taskId = task.id

@@ -13,7 +13,11 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Density
 import dev.tasknudge.core.ReminderSettings
+import dev.tasknudge.core.TaskInput
 import dev.tasknudge.data.*
+import dev.tasknudge.DeviceTestApplication
+import androidx.test.platform.app.InstrumentationRegistry
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
@@ -88,6 +92,40 @@ class TaskScreensTest {
         assertEquals("首のストレッチ", repo.data.value.tasks.single().title)
         assertEquals(1, repo.data.value.tasks.single().recurrenceDays)
         compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
+    }
+    @Test fun pastedLinesCreateTasksWithOneSharedRecurrence() {
+        val repo = ScreenRepository(); launch(repo)
+        compose.onNodeWithContentDescription("まとめて追加").performClick()
+        compose.onNodeWithText("タスク（1行に1件）").performTextInput(" 首 \n\n 腕 ")
+        compose.onNodeWithText("繰り返し（日）").performTextReplacement("3")
+        compose.onNodeWithText("まとめて保存").performScrollTo().performClick()
+        compose.waitUntil(10_000) { repo.data.value.tasks.size == 2 }
+        assertEquals(listOf("首", "腕"), repo.data.value.tasks.map { it.title })
+        assertEquals(listOf(3, 3), repo.data.value.tasks.map { it.recurrenceDays })
+        compose.onNodeWithText("首").assertIsDisplayed()
+    }
+    @Test fun pastedLinesReachTheRealDatabaseAndReturnToTheList() {
+        val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as DeviceTestApplication
+        app.resetFixture(notificationsEnabled = false)
+        try {
+            compose.setContent { TaskNudgeTheme(dynamicColor = false) { TaskNudgeApp(app.container.repository, false, {}) } }
+            compose.onNodeWithContentDescription("まとめて追加").performClick()
+            compose.onNodeWithText("タスク（1行に1件）").performTextInput("首\n腕")
+            compose.onNodeWithText("まとめて保存").performScrollTo().performClick()
+            compose.waitUntil(10_000) { runBlocking { app.database!!.dao().tasks().size == 2 } }
+            compose.onNodeWithText("今日の完了 0 / 2").assertIsDisplayed()
+            val tasks = runBlocking { app.database!!.dao().tasks() }
+            assertEquals(listOf("首", "腕"), tasks.map { it.task.title })
+            assertEquals(listOf(1, 1), tasks.map { it.task.recurrenceDays })
+        } finally { app.closeFixture() }
+    }
+    @Test fun bulkInputErrorLeavesAllTasksUnsaved() {
+        val repo = ScreenRepository(); launch(repo)
+        compose.onNodeWithContentDescription("まとめて追加").performClick()
+        compose.onNodeWithText("タスク（1行に1件）").performTextInput("首\n${"長".repeat(101)}")
+        compose.onNodeWithText("まとめて保存").performScrollTo().performClick()
+        compose.onNodeWithText("各タスク名は前後の空白を除き100文字以内で入力してください").assertExists()
+        compose.runOnIdle { assertTrue(repo.data.value.tasks.isEmpty()) }
     }
     @Test fun committedAddWaitsForDisplayDataWithoutOfferingDuplicateSave() {
         val repo = ScreenRepository(publishSaves = false); launch(repo)
@@ -296,6 +334,14 @@ private class ScreenRepository(tasks: List<TaskSnapshot> = emptyList(), private 
         pendingTask = task
         if (publishSaves) data.value = data.value.copy(tasks = data.value.tasks.filterNot { it.id == taskId } + task)
         return taskId
+    }
+    override suspend fun saveTasks(inputs: List<TaskInput>): List<Long> {
+        saveCalls++
+        gate?.await()
+        val startId = (data.value.tasks.maxOfOrNull { it.id } ?: 0) + 1
+        val added = inputs.mapIndexed { index, input -> TaskSnapshot(startId + index, input.title, input.recurrenceDays, false, Instant.now(), null, emptyList()) }
+        if (publishSaves) data.value = data.value.copy(tasks = data.value.tasks + added)
+        return added.map { it.id }
     }
     override suspend fun setArchived(id: Long, archived: Boolean) { data.value = data.value.copy(tasks = data.value.tasks.map { if (it.id == id) it.copy(archived = archived) else it }) }
     override suspend fun completeTask(id: Long) {
