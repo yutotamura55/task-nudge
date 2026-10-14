@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.core.validateSettings
 import dev.tasknudge.core.validateTaskInput
+import dev.tasknudge.core.validateBulkTaskInput
 import dev.tasknudge.data.TaskRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,7 +45,7 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
         if (restoredId == state.value.operation.sessionId) return restoredId
         val id = restoredId ?: (nextSessionId + 1)
         nextSessionId = maxOf(nextSessionId, id)
-        mutableState.update { it.copy(operation = ScreenOperation(id), titleError = null, recurrenceError = null, settingsError = null) }
+        mutableState.update { it.copy(operation = ScreenOperation(id), titleError = null, bulkError = null, recurrenceError = null, settingsError = null) }
         return id
     }
 
@@ -73,6 +74,23 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
         if (titleError != null || recurrenceError != null) return
         val input = validateTaskInput(title, days!!)
         mutate(sessionId) { OperationResult.TaskSaved(repository.saveTask(id, input.title, input.recurrenceDays)) }
+    }
+
+    fun saveTasks(text: String, recurrence: String, sessionId: Long = state.value.operation.sessionId) {
+        if (!canSubmit(sessionId)) return
+        val days = recurrence.toIntOrNull()
+        val titles = text.lines().map(String::trim).filter(String::isNotEmpty)
+        val bulkError = when {
+            titles.isEmpty() -> "タスクを1行以上入力してください"
+            titles.size > 100 -> "一度に追加できるタスクは100件までです"
+            titles.any { it.length > 100 } -> "各タスク名は前後の空白を除き100文字以内で入力してください"
+            else -> null
+        }
+        val recurrenceError = if (days == null || days !in 1..365) "繰り返しは1〜365日の整数で入力してください" else null
+        mutableState.update { it.copy(bulkError = bulkError, recurrenceError = recurrenceError) }
+        if (bulkError != null || recurrenceError != null) return
+        val inputs = validateBulkTaskInput(text, days!!)
+        mutate(sessionId) { OperationResult.TasksSaved(repository.saveTasks(inputs).size) }
     }
 
     fun saveSettings(start: String, end: String, interval: Int, sessionId: Long = state.value.operation.sessionId) {
