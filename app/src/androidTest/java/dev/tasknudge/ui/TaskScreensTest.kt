@@ -514,8 +514,14 @@ class TaskScreensTest {
         compose.onNodeWithText("繰り返しを設定").performClick()
         compose.onNodeWithText("時間ごと").performClick()
         compose.onNodeWithText("繰り返し（時間）").performTextReplacement("2")
+        compose.onNodeWithText("2").assertExists()
         compose.onNodeWithText("保存").performClick()
-        compose.waitUntil(10_000) { repo.data.value.tasks.singleOrNull()?.recurrenceHours == 2 }
+        try {
+            compose.waitUntil(10_000) { repo.data.value.tasks.isNotEmpty() }
+        } catch (e: Exception) {
+            throw AssertionError("saveCalls=${repo.saveCalls}; UI=${compose.onRoot().printToString()}", e)
+        }
+        assertEquals(2, repo.data.value.tasks.single().recurrenceHours)
         assertEquals(1, repo.data.value.tasks.single().recurrenceDays)
     }
     @Test fun notificationRoutesToDetailAndMissingTaskReturnsSafely() {
