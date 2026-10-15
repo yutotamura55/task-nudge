@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.Flow
  */
 interface TaskRepository {
     val snapshots: Flow<AppSnapshot>
-    suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int = 1): Long
+    suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int = 1, recurrenceHours: Int? = null): Long
     /** Inserts all tasks in one transaction and returns their committed IDs in input order. */
     suspend fun saveTasks(inputs: List<TaskInput>): List<Long>
     suspend fun setArchived(id: Long, archived: Boolean)

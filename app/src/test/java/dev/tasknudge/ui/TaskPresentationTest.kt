@@ -21,6 +21,13 @@ class TaskPresentationTest {
         assertEquals("停止中", taskStatus(task.copy(archived = true), now, zone))
         assertEquals("保留中・2026-10-01 20:00まで", taskStatus(task.copy(snoozedUntil = now.plusSeconds(3600)), now, zone))
     }
+    @Test fun hourlyTaskShowsNextTimeAndAllowsCompletionAfterInterval() {
+        val completed = CompletionRecord(1, now.minus(Duration.ofHours(1)), LocalDate.parse("2026-10-01"))
+        val hourly = task.copy(recurrenceDays = 1, recurrenceHours = 2, completions = listOf(completed))
+        assertEquals("次回対象 2026-10-01 20:00", taskStatus(hourly, now, zone))
+        assertFalse(taskCanComplete(hourly, now, zone))
+        assertTrue(taskCanComplete(hourly, now.plus(Duration.ofHours(1)), zone))
+    }
     @Test fun permissionOnlyRequestsOnExplicitFirstEnableWithMissingApi33Permission() {
         assertEquals(NotificationEnableAction.REQUEST, notificationEnableAction(33, false, false))
         assertEquals(NotificationEnableAction.SETTINGS, notificationEnableAction(33, false, true))

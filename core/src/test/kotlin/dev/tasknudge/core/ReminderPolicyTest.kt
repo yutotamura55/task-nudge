@@ -84,6 +84,23 @@ class ReminderPolicyTest {
         assertEquals(1L, select(listOf(task), Instant.parse("2026-10-01T00:00:00Z")))
     }
 
+    @Test fun hourlyRecurrenceReturnsAfterCompletionIntervalOnSameDay() {
+        val completed = now.minusSeconds(2 * 3600)
+        val task = ReminderTask(1, now.minusSeconds(86400), recurrenceHours = 3,
+            lastCompletedAt = completed, lastCompletedDate = LocalDate.parse("2026-09-30"), completedToday = true)
+        assertNull(select(listOf(task)))
+        assertEquals(1L, select(listOf(task), completed.plusSeconds(3 * 3600)))
+    }
+
+    @Test fun hourlyRecurrenceUsesElapsedTimeAcrossLocalMidnight() {
+        val completed = Instant.parse("2026-09-29T14:30:00Z")
+        val task = ReminderTask(1, completed.minusSeconds(3600), recurrenceHours = 2,
+            lastCompletedAt = completed, lastCompletedDate = LocalDate.parse("2026-09-29"))
+        val allDay = settings.copy(startHour = 0, endHour = 24)
+        assertNull(ReminderPolicy.select(listOf(task), Instant.parse("2026-09-29T15:00:00Z"), zone, allDay, null))
+        assertEquals(1L, ReminderPolicy.select(listOf(task), Instant.parse("2026-09-29T16:30:00Z"), zone, allDay, null))
+    }
+
     @Test fun yearlyRecurrenceRequires365CalendarDays() {
         val task = ReminderTask(1, Instant.parse("2025-09-30T00:00:00Z"), recurrenceDays = 365,
             lastCompletedAt = Instant.parse("2025-09-30T00:00:00Z"), lastCompletedDate = LocalDate.parse("2025-09-30"))
