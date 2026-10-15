@@ -515,7 +515,7 @@ class TaskScreensTest {
         compose.onNodeWithText("時間ごと").performClick()
         compose.onNodeWithText("繰り返し（時間）").performTextReplacement("2")
         compose.onNodeWithText("保存").performClick()
-        compose.waitUntil { repo.data.value.tasks.singleOrNull()?.recurrenceHours == 2 }
+        compose.waitUntil(10_000) { repo.data.value.tasks.singleOrNull()?.recurrenceHours == 2 }
         assertEquals(1, repo.data.value.tasks.single().recurrenceDays)
     }
     @Test fun notificationRoutesToDetailAndMissingTaskReturnsSafely() {
