@@ -518,7 +518,7 @@ class TaskScreensTest {
         compose.onNodeWithText("保存").performClick()
         try {
             compose.waitUntil(10_000) { repo.data.value.tasks.isNotEmpty() }
-        } catch (e: Exception) {
+        } catch (e: ComposeTimeoutException) {
             throw AssertionError("saveCalls=${repo.saveCalls}; UI=${compose.onRoot().printToString()}", e)
         }
         assertEquals(2, repo.data.value.tasks.single().recurrenceHours)
