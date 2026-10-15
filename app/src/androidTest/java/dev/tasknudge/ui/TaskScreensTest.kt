@@ -12,8 +12,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Density
-import androidx.test.espresso.Espresso
 import android.widget.EditText
+import android.view.inputmethod.InputMethodManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -55,6 +55,14 @@ class TaskScreensTest {
             activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput").setText(value)
         }
         compose.onNodeWithText("追加予定：${value.lines().count { it.isNotBlank() }}件").assertExists()
+    }
+    private fun dismissKeyboard() {
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val keyboard = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            keyboard.hideSoftInputFromWindow(activity.window.decorView.windowToken, 0)
+        }
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).waitForIdle()
     }
     @Test fun fourTasksRemainVisibleWithoutScrollingInACompactList() {
         val tasks = listOf(
@@ -109,7 +117,7 @@ class TaskScreensTest {
         val repo = ScreenRepository(); launch(repo)
         compose.onNodeWithContentDescription("タスクを追加").performClick()
         compose.onNodeWithText("タイトル").performTextInput("首のストレッチ")
-        Espresso.closeSoftKeyboard()
+        dismissKeyboard()
         compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick()
         try {
             compose.waitUntil(10_000) { repo.data.value.tasks.size == 1 }
@@ -452,14 +460,14 @@ class TaskScreensTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithText("タイトルは1〜100文字で入力してください", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("タイトルは1〜100文字で入力してください").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("タイトル").performTextInput("a".repeat(101))
-        Espresso.closeSoftKeyboard()
+        dismissKeyboard()
         compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("タイトルは1〜100文字で入力してください", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("タイトルは1〜100文字で入力してください").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("タイトル").performTextReplacement("腕")
         compose.onNodeWithText("繰り返しを設定").performClick()
         compose.onNodeWithText("繰り返し（日）").performTextReplacement("0")
-        Espresso.closeSoftKeyboard()
+        dismissKeyboard()
         compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick()
         compose.waitUntil(10_000) { compose.onAllNodesWithText("繰り返しは1〜365日の整数で入力してください", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("繰り返しは1〜365日の整数で入力してください").performScrollTo().assertIsDisplayed()
@@ -529,7 +537,7 @@ class TaskScreensTest {
         compose.onNodeWithText("時間ごと").performClick()
         compose.onNodeWithText("繰り返し（時間）").performTextReplacement("2")
         compose.onNodeWithText("2").assertExists()
-        Espresso.closeSoftKeyboard()
+        dismissKeyboard()
         compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick()
         try {
             compose.waitUntil(10_000) { repo.data.value.tasks.singleOrNull()?.recurrenceHours == 2 }
