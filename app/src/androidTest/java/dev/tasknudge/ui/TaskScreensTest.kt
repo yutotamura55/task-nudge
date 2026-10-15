@@ -307,6 +307,14 @@ class TaskScreensTest {
             assertNotNull("The editor should remain open after swiping", editor)
             assertTrue("Swipe should reveal earlier text: before=$initialScroll after=${editor.scrollX}", editor.scrollX < initialScroll)
             assertEquals("Panning should not change the edit position", caret, editor.selectionEnd)
+            assertTrue(editor.onCreateInputConnection(EditorInfo()).commitText("確認", 1))
+        }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            val caretX = editor.layout.getPrimaryHorizontal(editor.selectionEnd) + editor.totalPaddingLeft - editor.scrollX
+            assertTrue("Typing after panning must reveal the insertion point: caretX=$caretX", caretX in editor.totalPaddingLeft.toFloat()..(editor.width - editor.totalPaddingRight).toFloat())
         }
     }
     @Test fun pastedLinesReachTheRealDatabaseAndReturnToTheList() {

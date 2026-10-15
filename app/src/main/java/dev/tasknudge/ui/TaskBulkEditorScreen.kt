@@ -95,6 +95,8 @@ private fun NonWrappingBulkInput(value: String, onValueChange: (String) -> Unit)
                                 bringPointIntoView(composingEnd)
                                 val caretX = layout?.getPrimaryHorizontal(selectionEnd)
                                 if (caretX != null && scrollX > caretX) scrollTo(caretX.toInt().coerceAtLeast(0), scrollY)
+                            } else if (selectionEnd >= 0) {
+                                bringPointIntoView(selectionEnd)
                             }
                         }
                     }
