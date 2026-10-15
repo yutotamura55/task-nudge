@@ -119,8 +119,14 @@ class TaskScreensTest {
         compose.onNodeWithContentDescription("まとめて追加").performClick()
         enterBulkText(" 首 \n\n 腕 ")
         compose.onNodeWithText("繰り返し（日）").performTextReplacement("3")
-        compose.onNodeWithText("まとめて保存").performScrollTo().performClick()
-        compose.waitUntil(10_000) { repo.data.value.tasks.size == 2 }
+        compose.onNodeWithText("追加予定：2件").assertExists()
+        compose.onNodeWithText("3").assertExists()
+        compose.onNodeWithText("まとめて保存").performScrollTo().assertIsDisplayed().performClick()
+        try {
+            compose.waitUntil(10_000) { repo.data.value.tasks.size == 2 }
+        } catch (e: ComposeTimeoutException) {
+            throw AssertionError("saveCalls=${repo.saveCalls}; UI=${compose.onRoot().printToString()}", e)
+        }
         assertEquals(listOf("首", "腕"), repo.data.value.tasks.map { it.title })
         assertEquals(listOf(3, 3), repo.data.value.tasks.map { it.recurrenceDays })
         compose.onNodeWithText("首").assertIsDisplayed()
