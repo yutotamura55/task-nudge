@@ -12,6 +12,19 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Density
+import android.widget.EditText
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.os.Build
+import android.graphics.Rect
+import android.text.InputType
+import android.view.inputmethod.BaseInputConnection
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import androidx.test.uiautomator.UiDevice
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.core.TaskInput
 import dev.tasknudge.data.*
@@ -21,6 +34,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
+import org.junit.Assume.assumeTrue
 import org.junit.Rule
 import org.junit.Test
 import java.time.Clock
@@ -33,6 +47,12 @@ class TaskScreensTest {
     @get:Rule val compose = createComposeRule()
     private fun launch(repo: ScreenRepository, enabled: Boolean = true, initial: Long? = null, enable: () -> Unit = {}) {
         compose.setContent { TaskNudgeTheme(dynamicColor = false) { TaskNudgeApp(repo, enabled, enable, initial) } }
+    }
+    private fun enterBulkText(value: String) {
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput").setText(value)
+        }
     }
     @Test fun fourTasksRemainVisibleWithoutScrollingInACompactList() {
         val tasks = listOf(
@@ -96,7 +116,7 @@ class TaskScreensTest {
     @Test fun pastedLinesCreateTasksWithOneSharedRecurrence() {
         val repo = ScreenRepository(); launch(repo)
         compose.onNodeWithContentDescription("まとめて追加").performClick()
-        compose.onNodeWithText("タスク（1行に1件）").performTextInput(" 首 \n\n 腕 ")
+        enterBulkText(" 首 \n\n 腕 ")
         compose.onNodeWithText("繰り返し（日）").performTextReplacement("3")
         compose.onNodeWithText("まとめて保存").performScrollTo().performClick()
         compose.waitUntil(10_000) { repo.data.value.tasks.size == 2 }
@@ -104,13 +124,116 @@ class TaskScreensTest {
         assertEquals(listOf(3, 3), repo.data.value.tasks.map { it.recurrenceDays })
         compose.onNodeWithText("首").assertIsDisplayed()
     }
+    @Test fun longTaskStaysOnOneVisualLineWhileExplicitNewlineCreatesSecondTask() {
+        val repo = ScreenRepository(); launch(repo)
+        compose.onNodeWithContentDescription("まとめて追加").performClick()
+        val longTitle = "首と肩のストレッチをゆっくり丁寧に続けるための長いタスク名"
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            assertNotNull("The bulk input must support unwrapped multiline editing", editor)
+            editor.setText("$longTitle\n腕")
+        }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            assertEquals(2, editor.layout.lineCount)
+            assertTrue(editor.isHorizontallyScrollable)
+        }
+        val bounds = Rect()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput").getGlobalVisibleRect(bounds)
+        }
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(bounds.right - 150, bounds.top + 70, bounds.left + 150, bounds.top + 70, 20)
+        compose.waitForIdle()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            assertTrue("A horizontal swipe must reveal the end of the long line: width=${editor.width}, lineRight=${editor.layout.getLineRight(0)}, scrollX=${editor.scrollX}", editor.scrollX > 0)
+        }
+        compose.onNodeWithText("追加予定：2件").assertIsDisplayed()
+        compose.onNodeWithText("まとめて保存").performScrollTo().performClick()
+        compose.waitUntil(10_000) { repo.data.value.tasks.size == 2 }
+        assertEquals(listOf(longTitle, "腕"), repo.data.value.tasks.map { it.title })
+    }
+    @Test fun pastedNewlinesRemainSeparateTasks() {
+        assumeTrue("Clipboard paste is verified on the isolated CI emulator", Build.FINGERPRINT.contains("generic") || Build.MODEL.contains("sdk_gphone"))
+        val repo = ScreenRepository(); launch(repo)
+        compose.onNodeWithContentDescription("まとめて追加").performClick()
+        val clipboard = InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        try {
+            compose.runOnIdle {
+                val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+                val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+                clipboard.setPrimaryClip(ClipData.newPlainText("tasks", "首の長いストレッチ\n腕のストレッチ"))
+                editor.requestFocus()
+                assertTrue(editor.onTextContextMenuItem(android.R.id.paste))
+            }
+            compose.onNodeWithText("追加予定：2件").assertIsDisplayed()
+            compose.onNodeWithText("まとめて保存").performScrollTo().performClick()
+            compose.waitUntil(10_000) { repo.data.value.tasks.size == 2 }
+            assertEquals(listOf("首の長いストレッチ", "腕のストレッチ"), repo.data.value.tasks.map { it.title })
+        } finally {
+            compose.runOnIdle { if (Build.VERSION.SDK_INT >= 28) clipboard.clearPrimaryClip() }
+        }
+    }
+    @Test fun multilineBulkInputCanScrollVerticallyAndSelectText() {
+        val repo = ScreenRepository(); launch(repo)
+        compose.onNodeWithContentDescription("まとめて追加").performClick()
+        enterBulkText((1..20).joinToString("\n") { "タスク$it" })
+        val bounds = Rect()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            assertEquals(20, editor.layout.lineCount)
+            editor.setSelection(0, 3)
+            assertEquals(0, editor.selectionStart)
+            assertEquals(3, editor.selectionEnd)
+            editor.getGlobalVisibleRect(bounds)
+        }
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(bounds.centerX(), bounds.bottom - 90, bounds.centerX(), bounds.top + 90, 20)
+        compose.waitForIdle()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            assertTrue("Vertical swipe must scroll the multiline editor: height=${editor.height}, layoutHeight=${editor.layout.height}, scrollY=${editor.scrollY}, bounds=$bounds", editor.scrollY > 0)
+        }
+    }
+    @Test fun japaneseCompositionRemainsActiveAcrossScreenRecomposition() {
+        val repo = ScreenRepository(); launch(repo)
+        compose.onNodeWithContentDescription("まとめて追加").performClick()
+        lateinit var connection: InputConnection
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            editor.requestFocus()
+            val info = EditorInfo()
+            connection = editor.onCreateInputConnection(info)
+            assertTrue(info.inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE != 0)
+            assertTrue(connection.setComposingText("しゅ", 1))
+        }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            assertEquals("しゅ", editor.text.toString())
+            assertTrue("Recomposition must preserve Japanese composing text", BaseInputConnection.getComposingSpanStart(editor.text) >= 0)
+            assertTrue(connection.commitText("首", 1))
+        }
+        compose.onNodeWithText("追加予定：1件").assertIsDisplayed()
+        compose.onNodeWithText("まとめて保存").performScrollTo().performClick()
+        compose.waitUntil(10_000) { repo.data.value.tasks.size == 1 }
+        assertEquals("首", repo.data.value.tasks.single().title)
+    }
     @Test fun pastedLinesReachTheRealDatabaseAndReturnToTheList() {
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as DeviceTestApplication
         app.resetFixture(notificationsEnabled = false)
         try {
             compose.setContent { TaskNudgeTheme(dynamicColor = false) { TaskNudgeApp(app.container.repository, false, {}) } }
             compose.onNodeWithContentDescription("まとめて追加").performClick()
-            compose.onNodeWithText("タスク（1行に1件）").performTextInput("首\n腕")
+            enterBulkText("首\n腕")
             compose.onNodeWithText("まとめて保存").performScrollTo().performClick()
             compose.waitUntil(10_000) { runBlocking { app.database!!.dao().tasks().size == 2 } }
             compose.onNodeWithText("今日の完了 0 / 2").assertIsDisplayed()
@@ -122,7 +245,7 @@ class TaskScreensTest {
     @Test fun bulkInputErrorLeavesAllTasksUnsaved() {
         val repo = ScreenRepository(); launch(repo)
         compose.onNodeWithContentDescription("まとめて追加").performClick()
-        compose.onNodeWithText("タスク（1行に1件）").performTextInput("首\n${"長".repeat(101)}")
+        enterBulkText("首\n${"長".repeat(101)}")
         compose.onNodeWithText("まとめて保存").performScrollTo().performClick()
         compose.onNodeWithText("各タスク名は前後の空白を除き100文字以内で入力してください").assertExists()
         compose.runOnIdle { assertTrue(repo.data.value.tasks.isEmpty()) }
