@@ -148,7 +148,7 @@ class TaskScreensTest {
             activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput").getGlobalVisibleRect(bounds)
         }
         val swipeY = bounds.top + minOf(70, bounds.height() / 2)
-        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(bounds.right - 24, swipeY, bounds.left + 24, swipeY, 20)
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(bounds.right - 80, swipeY, bounds.left + 80, swipeY, 20)
         compose.waitForIdle()
         compose.runOnIdle {
             val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
@@ -228,6 +228,86 @@ class TaskScreensTest {
         compose.onNodeWithText("まとめて保存").performScrollTo().performClick()
         compose.waitUntil(10_000) { repo.data.value.tasks.size == 1 }
         assertEquals("首", repo.data.value.tasks.single().title)
+    }
+    @Test fun composingAtRightEdgeRemainsVisibleBeforeCommit() {
+        val repo = ScreenRepository(); launch(repo)
+        compose.onNodeWithContentDescription("まとめて追加").performClick()
+        lateinit var connection: InputConnection
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            editor.setText("首と肩のストレッチをゆっくり丁寧に続けるための長いタスク名")
+            editor.requestFocus()
+            editor.setSelection(editor.text.length)
+            connection = editor.onCreateInputConnection(EditorInfo())
+            assertTrue(connection.setComposingText("しゅう", 0))
+        }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            assertTrue(BaseInputConnection.getComposingSpanStart(editor.text) >= 0)
+            val composingEnd = BaseInputConnection.getComposingSpanEnd(editor.text)
+            val caretX = editor.layout.getPrimaryHorizontal(composingEnd) + editor.totalPaddingLeft - editor.scrollX
+            val visibleRight = editor.width - editor.totalPaddingRight
+            assertTrue("Composing text is outside the input: right=$caretX visibleRight=$visibleRight scrollX=${editor.scrollX}", caretX <= visibleRight + 2)
+        }
+    }
+    @Test fun longCompositionKeepsImeCaretVisible() {
+        val repo = ScreenRepository(); launch(repo)
+        compose.onNodeWithContentDescription("まとめて追加").performClick()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            editor.setText("首と肩のストレッチをゆっくり丁寧に続けるための長いタスク名")
+            editor.requestFocus()
+            editor.setSelection(editor.text.length)
+            assertTrue(editor.onCreateInputConnection(EditorInfo()).setComposingText("しゅう".repeat(20), 0))
+        }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            val caretX = editor.layout.getPrimaryHorizontal(editor.selectionEnd) + editor.totalPaddingLeft - editor.scrollX
+            val composingEnd = BaseInputConnection.getComposingSpanEnd(editor.text)
+            val composingRight = editor.layout.getPrimaryHorizontal(composingEnd) + editor.totalPaddingLeft - editor.scrollX
+            assertTrue("This case must contain text wider than the viewport", composingRight > editor.width - editor.totalPaddingRight)
+            assertTrue("IME caret moved off the left edge: caretX=$caretX", caretX >= editor.totalPaddingLeft)
+            assertTrue("IME caret moved off the right edge: caretX=$caretX", caretX <= editor.width - editor.totalPaddingRight)
+        }
+    }
+    @Test fun focusedBulkInputCanPanBackWithoutMovingCaret() {
+        val repo = ScreenRepository(); launch(repo)
+        compose.onNodeWithContentDescription("まとめて追加").performClick()
+        val bounds = Rect()
+        var initialScroll = 0
+        var caret = 0
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            editor.setText("首と肩のストレッチをゆっくり丁寧に続けるための長いタスク名")
+            editor.requestFocus()
+            editor.setSelection(editor.text.length)
+        }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            initialScroll = editor.scrollX
+            caret = editor.selectionEnd
+            editor.getGlobalVisibleRect(bounds)
+        }
+        assertTrue("The caret must start beyond the first viewport: scrollX=$initialScroll", initialScroll > 0)
+        val swipeY = bounds.top + minOf(70, bounds.height() / 2)
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(bounds.left + 80, swipeY, bounds.right - 80, swipeY, 20)
+        compose.waitForIdle()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            assertNotNull("The editor should remain open after swiping", editor)
+            assertTrue("Swipe should reveal earlier text: before=$initialScroll after=${editor.scrollX}", editor.scrollX < initialScroll)
+            assertEquals("Panning should not change the edit position", caret, editor.selectionEnd)
+        }
     }
     @Test fun pastedLinesReachTheRealDatabaseAndReturnToTheList() {
         val app = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as DeviceTestApplication

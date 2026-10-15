@@ -6,7 +6,7 @@ import android.text.TextWatcher
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
-import android.widget.EditText
+import android.view.inputmethod.BaseInputConnection
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -67,7 +67,7 @@ private fun NonWrappingBulkInput(value: String, onValueChange: (String) -> Unit)
         modifier = Modifier.fillMaxWidth(),
         factory = { context ->
             val padding = (16 * context.resources.displayMetrics.density).toInt()
-            EditText(context).apply {
+            BulkTaskEditText(context).apply {
                 tag = "bulkTaskInput"
                 inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
                 setHorizontallyScrolling(true)
@@ -87,7 +87,17 @@ private fun NonWrappingBulkInput(value: String, onValueChange: (String) -> Unit)
                 addTextChangedListener(object : TextWatcher {
                     override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                     override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-                    override fun afterTextChanged(s: Editable?) { currentOnValueChange(s?.toString().orEmpty()) }
+                    override fun afterTextChanged(s: Editable?) {
+                        currentOnValueChange(s?.toString().orEmpty())
+                        post {
+                            val composingEnd = BaseInputConnection.getComposingSpanEnd(text)
+                            if (composingEnd > selectionEnd && selectionEnd >= 0) {
+                                bringPointIntoView(composingEnd)
+                                val caretX = layout?.getPrimaryHorizontal(selectionEnd)
+                                if (caretX != null && scrollX > caretX) scrollTo(caretX.toInt().coerceAtLeast(0), scrollY)
+                            }
+                        }
+                    }
                 })
             }
         },
