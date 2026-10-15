@@ -146,7 +146,8 @@ class TaskScreensTest {
             val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
             activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput").getGlobalVisibleRect(bounds)
         }
-        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(bounds.right - 150, bounds.top + 70, bounds.left + 150, bounds.top + 70, 20)
+        val swipeY = bounds.top + minOf(70, bounds.height() / 2)
+        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).swipe(bounds.right - 24, swipeY, bounds.left + 24, swipeY, 20)
         compose.waitForIdle()
         compose.runOnIdle {
             val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
