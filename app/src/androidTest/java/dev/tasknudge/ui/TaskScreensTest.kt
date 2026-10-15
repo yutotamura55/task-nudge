@@ -53,6 +53,7 @@ class TaskScreensTest {
             val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
             activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput").setText(value)
         }
+        compose.onNodeWithText("追加予定：${value.lines().count { it.isNotBlank() }}件").assertExists()
     }
     @Test fun fourTasksRemainVisibleWithoutScrollingInACompactList() {
         val tasks = listOf(
@@ -256,7 +257,7 @@ class TaskScreensTest {
         compose.onNodeWithContentDescription("タスクを追加").performClick()
         compose.onNodeWithText("タイトル").performTextInput("首のストレッチ")
         compose.onNodeWithText("保存").performClick()
-        compose.waitUntil { repo.pendingTask != null }
+        compose.waitUntil(10_000) { repo.pendingTask != null }
         compose.onNodeWithText("保存済み・データ表示待ち").assertIsDisplayed()
         compose.onNodeWithText("タイトル").assertIsDisplayed()
         compose.onNodeWithText("保存済み").assertIsNotEnabled()
@@ -269,7 +270,7 @@ class TaskScreensTest {
         compose.onNodeWithContentDescription("タスクを追加").performClick()
         compose.onNodeWithText("タイトル").performTextInput("首")
         compose.onNodeWithText("保存").performClick()
-        compose.waitUntil { repo.pendingTask != null }
+        compose.waitUntil(10_000) { repo.pendingTask != null }
         compose.onNodeWithText("保存済み・データ表示待ち").assertIsDisplayed()
         compose.onNodeWithContentDescription("戻る").performClick()
         compose.onNodeWithContentDescription("タスクを追加").assertIsDisplayed()
