@@ -109,7 +109,11 @@ class TaskScreensTest {
         compose.onNodeWithContentDescription("タスクを追加").performClick()
         compose.onNodeWithText("タイトル").performTextInput("首のストレッチ")
         compose.onNodeWithText("保存").performClick()
-        compose.waitUntil(10_000) { repo.data.value.tasks.size == 1 }
+        try {
+            compose.waitUntil(10_000) { repo.data.value.tasks.size == 1 }
+        } catch (e: ComposeTimeoutException) {
+            throw AssertionError("saveCalls=${repo.saveCalls}; UI=${compose.onRoot().printToString()}", e)
+        }
         assertEquals("首のストレッチ", repo.data.value.tasks.single().title)
         assertEquals(1, repo.data.value.tasks.single().recurrenceDays)
         compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
@@ -522,7 +526,11 @@ class TaskScreensTest {
         compose.onNodeWithText("繰り返し（時間）").performTextReplacement("2")
         compose.onNodeWithText("2").assertExists()
         compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick()
-        compose.waitUntil(10_000) { repo.data.value.tasks.singleOrNull()?.recurrenceHours == 2 }
+        try {
+            compose.waitUntil(10_000) { repo.data.value.tasks.singleOrNull()?.recurrenceHours == 2 }
+        } catch (e: ComposeTimeoutException) {
+            throw AssertionError("saveCalls=${repo.saveCalls}; tasks=${repo.data.value.tasks}; UI=${compose.onRoot().printToString()}", e)
+        }
         assertEquals(1, repo.data.value.tasks.single().recurrenceDays)
     }
     @Test fun notificationRoutesToDetailAndMissingTaskReturnsSafely() {
