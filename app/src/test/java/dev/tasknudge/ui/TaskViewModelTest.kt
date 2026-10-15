@@ -64,6 +64,14 @@ class TaskViewModelTest {
         assertEquals(SavedInput(9, "腕", 3), repo.saved.single())
         assertEquals(9L, vm.savedTaskId)
     }
+    @Test fun hourlyRecurrenceUsesHoursAndRejectsOutOfRangeInput() = runTest(dispatcher) {
+        val repo = FakeRepository(); val vm = TaskViewModel(repo)
+        vm.saveTask(null, "水を飲む", "25", hourly = true); runCurrent()
+        assertNotNull(vm.state.value.recurrenceError)
+        assertTrue(repo.saved.isEmpty())
+        vm.saveTask(null, "水を飲む", "2", hourly = true); runCurrent()
+        assertEquals(SavedInput(null, "水を飲む", 1, 2), repo.saved.single())
+    }
     @Test fun rejectsBlankAndLongTitlesBeforeWriting() = runTest(dispatcher) {
         val repo = FakeRepository(); val vm = TaskViewModel(repo)
         for (title in listOf("  ", "a".repeat(101))) {
@@ -285,7 +293,7 @@ private val TaskViewModel.savedTaskId: Long?
 private val TaskViewModel.settingsSaved: Boolean
     get() = state.value.operation.state == OperationState.Committed(OperationResult.SettingsSaved)
 
-private data class SavedInput(val id: Long?, val title: String, val days: Int)
+private data class SavedInput(val id: Long?, val title: String, val days: Int, val hours: Int? = null)
 private fun task(id: Long) = TaskSnapshot(id, "首", 1, false, Instant.EPOCH, null, emptyList())
 private class FakeRepository(emitFailure: Boolean = false) : TaskRepository {
     val data = MutableSharedFlow<AppSnapshot>(replay = 1)
@@ -311,12 +319,12 @@ private class FakeRepository(emitFailure: Boolean = false) : TaskRepository {
     var fail = false
     var publishSaves = true
     var pending: TaskSnapshot? = null
-    override suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int): Long {
+    override suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int, recurrenceHours: Int?): Long {
         if (fail) error("disk")
-        saved += SavedInput(id, title, recurrenceDays); gate?.await()
+        saved += SavedInput(id, title, recurrenceDays, recurrenceHours); gate?.await()
         if (failAfterGate) error("disk")
         val savedId = id ?: 1
-        pending = task(savedId).copy(title = title, recurrenceDays = recurrenceDays)
+        pending = task(savedId).copy(title = title, recurrenceDays = recurrenceDays, recurrenceHours = recurrenceHours)
         if (publishSaves) publishPending()
         return savedId
     }

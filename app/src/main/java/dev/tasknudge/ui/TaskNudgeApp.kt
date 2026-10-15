@@ -136,7 +136,7 @@ fun TaskNudgeApp(
                             val taskId = shownTaskId
                             val savedId = ((state.operation.state as? OperationState.Committed)?.result as? OperationResult.TaskSaved)?.id
                             if (savedId != null && snapshot.tasks.none { it.id == savedId }) Text("保存済み・データ表示待ち", modifier = Modifier.padding(16.dp))
-                            TaskEditorScreen(task, state) { title, recurrence -> vm.saveTask(taskId, title, recurrence, owner) }
+                            TaskEditorScreen(task, state) { title, recurrence, hourly -> vm.saveTask(taskId, title, recurrence, owner, hourly) }
                         }
                         screen == "bulk" -> TaskBulkEditorScreen(state) { text, recurrence -> vm.saveTasks(text, recurrence, owner) }
                         screen == "settings" -> SettingsScreen(snapshot.settings, snapshot.permissionRequested, notificationsEnabled, state, { if (sessionId == owner) onEnableNotifications() }) { start, end, interval -> vm.saveSettings(start, end, interval, owner) }
