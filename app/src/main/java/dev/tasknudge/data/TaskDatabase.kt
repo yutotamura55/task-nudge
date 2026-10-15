@@ -5,7 +5,7 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-@Database(entities = [TaskEntity::class, CompletionEntity::class, ReminderStateEntity::class, ActiveReminderEntity::class, ReminderSettingsEntity::class], version = 2, exportSchema = true)
+@Database(entities = [TaskEntity::class, CompletionEntity::class, ReminderStateEntity::class, ActiveReminderEntity::class, ReminderSettingsEntity::class], version = 3, exportSchema = true)
 abstract class TaskDatabase : RoomDatabase() {
     abstract fun dao(): TaskDao
     companion object {
@@ -25,6 +25,13 @@ abstract class TaskDatabase : RoomDatabase() {
                 db.execSQL("INSERT INTO reminder_state_new (id, lastNotifiedAt) SELECT id, lastNotifiedAt FROM reminder_state")
                 db.execSQL("DROP TABLE reminder_state")
                 db.execSQL("ALTER TABLE reminder_state_new RENAME TO reminder_state")
+            }
+        }
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE tasks ADD COLUMN recurrenceHours INTEGER")
+                db.execSQL("DROP INDEX index_completions_taskId_localDate")
+                db.execSQL("CREATE UNIQUE INDEX index_completions_taskId_localDate_completedAt ON completions (taskId, localDate, completedAt)")
             }
         }
     }

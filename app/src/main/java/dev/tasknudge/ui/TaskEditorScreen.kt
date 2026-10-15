@@ -13,25 +13,30 @@ import androidx.compose.ui.unit.dp
 import dev.tasknudge.data.TaskSnapshot
 
 @Composable
-fun TaskEditorScreen(task: TaskSnapshot?, state: TaskUiState, onSave: (String, String) -> Unit) {
+fun TaskEditorScreen(task: TaskSnapshot?, state: TaskUiState, onSave: (String, String, Boolean) -> Unit) {
     var title by rememberSaveable(task?.id) { mutableStateOf(task?.title ?: "") }
-    var recurrence by rememberSaveable(task?.id) { mutableStateOf((task?.recurrenceDays ?: 1).toString()) }
-    var showRecurrence by rememberSaveable(task?.id) { mutableStateOf(task != null && task.recurrenceDays != 1) }
+    var recurrence by rememberSaveable(task?.id) { mutableStateOf((task?.recurrenceHours ?: task?.recurrenceDays ?: 1).toString()) }
+    var hourly by rememberSaveable(task?.id) { mutableStateOf(task?.recurrenceHours != null) }
+    var showRecurrence by rememberSaveable(task?.id) { mutableStateOf(task != null && (task.recurrenceDays != 1 || task.recurrenceHours != null)) }
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("タイトルだけで追加できます。毎日思い出したい行動をひとつ。", style = MaterialTheme.typography.bodyLarge)
+        Text("タイトルだけで追加できます。思い出したい行動をひとつ。", style = MaterialTheme.typography.bodyLarge)
         OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("タイトル") },
             modifier = Modifier.fillMaxWidth(), isError = state.titleError != null,
             supportingText = { Text(state.titleError ?: "前後の空白を除き1〜100文字") })
         TextButton(onClick = { showRecurrence = !showRecurrence }) { Text(if (showRecurrence) "繰り返しを閉じる" else "繰り返しを設定") }
         if (showRecurrence) {
-            OutlinedTextField(value = recurrence, onValueChange = { recurrence = it }, label = { Text("繰り返し（日）") },
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = !hourly, onClick = { hourly = false; recurrence = "1" }, label = { Text("日ごと") })
+                FilterChip(selected = hourly, onClick = { hourly = true; recurrence = "3" }, label = { Text("時間ごと") })
+            }
+            OutlinedTextField(value = recurrence, onValueChange = { recurrence = it }, label = { Text(if (hourly) "繰り返し（時間）" else "繰り返し（日）") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                isError = state.recurrenceError != null, supportingText = { Text(state.recurrenceError ?: "1〜365日。最後に完了した日から数えます。") })
+                isError = state.recurrenceError != null, supportingText = { Text(state.recurrenceError ?: if (hourly) "1〜24時間。最後の完了時刻から数えます。" else "1〜365日。最後に完了した日から数えます。") })
         } else {
-            Text("繰り返し：${recurrence}日ごと", style = MaterialTheme.typography.bodyMedium)
+            Text("繰り返し：${recurrence}${if (hourly) "時間" else "日"}ごと", style = MaterialTheme.typography.bodyMedium)
             state.recurrenceError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
-        Button(onClick = { onSave(title, recurrence) }, enabled = state.canSubmit, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+        Button(onClick = { onSave(title, recurrence, hourly) }, enabled = state.canSubmit, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
             Text(if (state.saving) "保存中…" else if (!state.canSubmit) "保存済み" else "保存")
         }
     }

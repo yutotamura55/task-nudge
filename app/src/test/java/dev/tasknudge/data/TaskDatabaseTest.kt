@@ -39,6 +39,26 @@ class TaskDatabaseTest {
         assertEquals(1, task.completions.size)
         assertEquals(LocalDate.parse("2026-10-01"), task.completions.single().localDate)
     }
+    @Test fun hourlyTaskRecordsMultipleCompletionsOnOneDateAfterItsInterval() = runTest {
+        var current = Instant.parse("2026-10-01T01:00:00Z")
+        val clock = object : Clock() {
+            override fun getZone(): ZoneId = ZoneOffset.UTC
+            override fun withZone(zone: ZoneId): Clock = this
+            override fun instant(): Instant = current
+        }
+        val repo = ReminderEngine(db, clock, { zone }, SilentGateway(), SilentScheduler()).repository
+        val id = repo.saveTask(null, "水を飲む", recurrenceHours = 2)
+        repo.completeTask(id)
+        current = current.plus(Duration.ofHours(1))
+        repo.completeTask(id)
+        assertEquals(1, repo.snapshots.first().tasks.single().completions.size)
+        current = current.plus(Duration.ofHours(1))
+        repo.completeTask(id)
+        val task = repo.snapshots.first().tasks.single()
+        assertEquals(2, task.recurrenceHours)
+        assertEquals(2, task.completions.size)
+        assertEquals(1, task.completions.map { it.localDate }.distinct().size)
+    }
     @Test fun editsAndArchivePreserveHistoryAndOriginalDay() = runTest {
         val id = repository.saveTask(null, "首")
         repository.completeTask(id)
@@ -55,6 +75,7 @@ class TaskDatabaseTest {
             try { repository.saveTask(null, title); fail("invalid title accepted") } catch (_: IllegalArgumentException) { }
         }
         try { repository.saveTask(null, "首", 0); fail("invalid interval accepted") } catch (_: IllegalArgumentException) { }
+        try { repository.saveTask(null, "首", recurrenceHours = 0); fail("invalid hourly interval accepted") } catch (_: IllegalArgumentException) { }
         try { repository.saveSettings(ReminderSettings(startHour = 22)); fail("invalid hours accepted") } catch (_: IllegalArgumentException) { }
         assertTrue(repository.snapshots.first().tasks.isEmpty())
         assertEquals(ReminderSettings(), repository.snapshots.first().settings)
@@ -62,14 +83,14 @@ class TaskDatabaseTest {
     @Test fun sqliteUniqueConstraintRejectsDuplicateOutsideRepository() = runTest {
         val id = repository.saveTask(null, "首")
         assertTrue(db.dao().insertCompletion(CompletionEntity(taskId = id, completedAt = 1, localDate = "2026-10-01")) > 0)
-        assertEquals(-1L, db.dao().insertCompletion(CompletionEntity(taskId = id, completedAt = 2, localDate = "2026-10-01")))
+        assertEquals(-1L, db.dao().insertCompletion(CompletionEntity(taskId = id, completedAt = 1, localDate = "2026-10-01")))
         assertEquals(1, repository.snapshots.first().tasks.single().completions.size)
     }
     @Test fun diskReopenRetainsTasksCompletionAndSettings() = runTest {
         val context = RuntimeEnvironment.getApplication()
         val name = "task2-persistence.db"
         context.deleteDatabase(name)
-        fun open() = Room.databaseBuilder(context, TaskDatabase::class.java, name).addMigrations(TaskDatabase.MIGRATION_1_2).addCallback(TaskDatabase.initializeDefaults).allowMainThreadQueries().build()
+        fun open() = Room.databaseBuilder(context, TaskDatabase::class.java, name).addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3).addCallback(TaskDatabase.initializeDefaults).allowMainThreadQueries().build()
         try {
             var stored = open()
             try {
@@ -106,13 +127,46 @@ class TaskDatabaseTest {
         } finally { old.close() }
         try {
             val upgraded = Room.databaseBuilder(context, TaskDatabase::class.java, name)
-                .addMigrations(TaskDatabase.MIGRATION_1_2).allowMainThreadQueries().build()
+                .addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3).allowMainThreadQueries().build()
             try {
                 assertEquals("首", upgraded.dao().task(7)?.title)
                 assertEquals(15, upgraded.dao().settings().intervalMinutes)
                 assertEquals(200L, upgraded.dao().state().lastNotifiedAt)
                 assertEquals("old-token", upgraded.dao().activeReminders().single().token)
                 assertEquals(1, upgraded.dao().activeReminders().single().notificationId)
+            } finally { upgraded.close() }
+        } finally { context.deleteDatabase(name) }
+    }
+    @Test fun versionTwoDatabaseKeepsHistoryAndAllowsAnotherSameDayCompletion() = runTest {
+        val context = RuntimeEnvironment.getApplication()
+        val name = "task-nudge-migration-2-3.db"
+        context.deleteDatabase(name)
+        val old = context.openOrCreateDatabase(name, Application.MODE_PRIVATE, null)
+        try {
+            old.execSQL("CREATE TABLE tasks (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, title TEXT NOT NULL, recurrenceDays INTEGER NOT NULL, createdAt INTEGER NOT NULL, archived INTEGER NOT NULL, snoozedUntil INTEGER)")
+            old.execSQL("CREATE TABLE completions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, taskId INTEGER NOT NULL, completedAt INTEGER NOT NULL, localDate TEXT NOT NULL, FOREIGN KEY(taskId) REFERENCES tasks(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+            old.execSQL("CREATE INDEX index_completions_taskId ON completions (taskId)")
+            old.execSQL("CREATE UNIQUE INDEX index_completions_taskId_localDate ON completions (taskId, localDate)")
+            old.execSQL("CREATE TABLE reminder_state (id INTEGER NOT NULL, lastNotifiedAt INTEGER, PRIMARY KEY(id))")
+            old.execSQL("CREATE TABLE active_reminders (notificationId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, taskId INTEGER NOT NULL, token TEXT NOT NULL, localDate TEXT NOT NULL, preparedAt INTEGER NOT NULL, deliveredAt INTEGER, FOREIGN KEY(taskId) REFERENCES tasks(id) ON UPDATE NO ACTION ON DELETE CASCADE)")
+            old.execSQL("CREATE INDEX index_active_reminders_taskId ON active_reminders (taskId)")
+            old.execSQL("CREATE UNIQUE INDEX index_active_reminders_token ON active_reminders (token)")
+            old.execSQL("CREATE TABLE reminder_settings (id INTEGER NOT NULL, startHour INTEGER NOT NULL, endHour INTEGER NOT NULL, intervalMinutes INTEGER NOT NULL, permissionRequested INTEGER NOT NULL, PRIMARY KEY(id))")
+            old.execSQL("INSERT INTO tasks VALUES (7, '水を飲む', 1, 100, 0, NULL)")
+            old.execSQL("INSERT INTO completions VALUES (1, 7, 1000, '2026-10-01')")
+            old.execSQL("INSERT INTO reminder_state VALUES (1, NULL)")
+            old.execSQL("INSERT INTO reminder_settings VALUES (1, 9, 21, 30, 0)")
+            old.version = 2
+        } finally { old.close() }
+        try {
+            val upgraded = Room.databaseBuilder(context, TaskDatabase::class.java, name)
+                .addMigrations(TaskDatabase.MIGRATION_2_3).allowMainThreadQueries().build()
+            try {
+                val task = upgraded.dao().taskWithCompletions(7)!!
+                assertNull(task.task.recurrenceHours)
+                assertEquals(1, task.completions.size)
+                assertTrue(upgraded.dao().insertCompletion(CompletionEntity(taskId = 7, completedAt = 2000, localDate = "2026-10-01")) > 0)
+                assertEquals(2, upgraded.dao().taskWithCompletions(7)!!.completions.size)
             } finally { upgraded.close() }
         } finally { context.deleteDatabase(name) }
     }

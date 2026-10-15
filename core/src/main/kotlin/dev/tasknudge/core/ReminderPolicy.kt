@@ -10,6 +10,7 @@ data class ReminderTask(
     val id: Long,
     val createdAt: Instant,
     val recurrenceDays: Int = 1,
+    val recurrenceHours: Int? = null,
     val archived: Boolean = false,
     val lastCompletedAt: Instant? = null,
     val lastCompletedDate: LocalDate? = null,
@@ -40,9 +41,14 @@ object ReminderPolicy {
         val today = now.atZone(zone).toLocalDate()
         return tasks.asSequence()
             .filter { task ->
-                !task.archived && !task.completedToday &&
-                    (task.lastCompletedDate == null ||
-                        ChronoUnit.DAYS.between(task.lastCompletedDate, today) >= task.recurrenceDays) &&
+                !task.archived &&
+                    (if (task.recurrenceHours != null) {
+                        task.lastCompletedAt == null ||
+                            !now.isBefore(task.lastCompletedAt.plus(Duration.ofHours(task.recurrenceHours.toLong())))
+                    } else {
+                        !task.completedToday && (task.lastCompletedDate == null ||
+                            ChronoUnit.DAYS.between(task.lastCompletedDate, today) >= task.recurrenceDays)
+                    }) &&
                     (task.snoozedUntil == null || !now.isBefore(task.snoozedUntil))
             }
             .minWithOrNull(

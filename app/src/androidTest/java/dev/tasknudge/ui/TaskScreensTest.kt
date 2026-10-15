@@ -418,6 +418,18 @@ class TaskScreensTest {
         compose.waitUntil { repo.data.value.tasks.size == 1 }
         assertEquals(7, repo.data.value.tasks.single().recurrenceDays)
     }
+    @Test fun taskEditorSavesHourlyRecurrence() {
+        val repo = ScreenRepository()
+        launch(repo)
+        compose.onNodeWithContentDescription("タスクを追加").performClick()
+        compose.onNodeWithText("タイトル").performTextInput("水を飲む")
+        compose.onNodeWithText("繰り返しを設定").performClick()
+        compose.onNodeWithText("時間ごと").performClick()
+        compose.onNodeWithText("繰り返し（時間）").performTextReplacement("2")
+        compose.onNodeWithText("保存").performClick()
+        compose.waitUntil { repo.data.value.tasks.singleOrNull()?.recurrenceHours == 2 }
+        assertEquals(1, repo.data.value.tasks.single().recurrenceDays)
+    }
     @Test fun notificationRoutesToDetailAndMissingTaskReturnsSafely() {
         val repo = ScreenRepository(listOf(sampleTask())); launch(repo, initial = 1)
         compose.onNodeWithText("実行履歴（1回）").assertIsDisplayed()
@@ -450,12 +462,12 @@ private class ScreenRepository(tasks: List<TaskSnapshot> = emptyList(), private 
     var gate: CompletableDeferred<Unit>? = null
     val data = MutableStateFlow(AppSnapshot(tasks, ReminderSettings(), false))
     override val snapshots = data
-    override suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int): Long {
+    override suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int, recurrenceHours: Int?): Long {
         saveCalls++
         gate?.await()
         val taskId = id ?: (data.value.tasks.maxOfOrNull { it.id } ?: 0) + 1
-        val task = data.value.tasks.find { it.id == taskId }?.copy(title = title, recurrenceDays = recurrenceDays)
-            ?: TaskSnapshot(taskId, title, recurrenceDays, false, Instant.now(), null, emptyList())
+        val task = data.value.tasks.find { it.id == taskId }?.copy(title = title, recurrenceDays = recurrenceDays, recurrenceHours = recurrenceHours)
+            ?: TaskSnapshot(taskId, title, recurrenceDays, false, Instant.now(), null, emptyList(), recurrenceHours)
         pendingTask = task
         if (publishSaves) data.value = data.value.copy(tasks = data.value.tasks.filterNot { it.id == taskId } + task)
         return taskId

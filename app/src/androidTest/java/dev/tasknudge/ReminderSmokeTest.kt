@@ -59,6 +59,22 @@ class ReminderSmokeTest {
         assertEquals(nextToken, app.awaitActiveReminder().notification.extras.getString("token"))
         assertEquals(1, dao.taskWithCompletions(first)?.completions?.size)
     }
+    @Test fun hourlyTaskNotifiesAgainOnSameDateAfterCompletionInterval() = runBlocking {
+        val id = app.container.repository.saveTask(null, "水を飲む", recurrenceHours = 2)
+        app.container.engine.evaluate()
+        val first = app.awaitActiveReminder()
+        first.notification.actions.first { it.title.toString() == "完了" }.actionIntent.send()
+        await { dao.taskWithCompletions(id)?.completions?.size == 1 && activeReminderCount() == 0 }
+
+        app.fixedClock.instantValue = app.fixedClock.instantValue.plus(Duration.ofHours(1))
+        app.container.engine.evaluate()
+        assertEquals(0, activeReminderCount())
+        app.fixedClock.instantValue = app.fixedClock.instantValue.plus(Duration.ofHours(1))
+        app.container.engine.evaluate()
+        val second = app.awaitActiveReminder()
+        assertEquals(id, second.notification.extras.getLong("taskId"))
+        assertNotEquals(first.notification.extras.getString("token"), second.notification.extras.getString("token"))
+    }
 
     @Test fun snoozeActionDefersForOneDayAndDuplicateDoesNotExtendIt() = runBlocking {
         val taskId = app.container.repository.saveTask(null, "背筋を伸ばす", 1)

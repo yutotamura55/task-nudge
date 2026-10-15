@@ -13,18 +13,32 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import dev.tasknudge.data.TaskSnapshot
 import java.time.Instant
+import java.time.Duration
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 fun taskStatus(task: TaskSnapshot, now: Instant, zone: ZoneId): String {
     if (task.archived) return "停止中"
     val today = now.atZone(zone).toLocalDate()
-    if (task.completions.any { it.localDate == today }) return "今日完了"
     val last = task.completions.maxByOrNull { it.completedAt }
-    val next = last?.localDate?.plusDays(task.recurrenceDays.toLong())
-    if (next != null && next.isAfter(today)) return "次回対象日 $next"
+    if (task.recurrenceHours != null) {
+        val next = last?.completedAt?.plus(Duration.ofHours(task.recurrenceHours.toLong()))
+        if (next != null && now.isBefore(next)) return "次回対象 ${next.atZone(zone).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))}"
+    } else {
+        if (task.completions.any { it.localDate == today }) return "今日完了"
+        val next = last?.localDate?.plusDays(task.recurrenceDays.toLong())
+        if (next != null && next.isAfter(today)) return "次回対象日 $next"
+    }
     if (task.snoozedUntil?.isAfter(now) == true) return "保留中・${task.snoozedUntil.atZone(zone).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))}まで"
     return "実行できます"
+}
+
+fun taskCanComplete(task: TaskSnapshot, now: Instant, zone: ZoneId): Boolean {
+    if (task.archived) return false
+    val last = task.completions.maxByOrNull { it.completedAt }
+    return if (task.recurrenceHours != null)
+        last == null || !now.isBefore(last.completedAt.plus(Duration.ofHours(task.recurrenceHours.toLong())))
+    else task.completions.none { it.localDate == now.atZone(zone).toLocalDate() }
 }
 
 @Composable
@@ -56,7 +70,7 @@ fun TaskListScreen(
         }
         items(visible, key = { it.id }) { task ->
             val largeText = LocalDensity.current.fontScale >= 1.5f
-            val completedToday = task.completions.any { it.localDate == today }
+            val canComplete = taskCanComplete(task, now, zone)
             val details: @Composable (Modifier) -> Unit = { modifier ->
                 Column(modifier) {
                     Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = if (largeText) 3 else 2, overflow = TextOverflow.Ellipsis)
@@ -66,8 +80,8 @@ fun TaskListScreen(
             }
             val completeAction: @Composable () -> Unit = {
                 if (!task.archived) {
-                    TextButton(onClick = { onComplete(task.id) }, enabled = !saving && !completedToday) {
-                        Text(if (completedToday) "今日完了済み" else "完了")
+                    TextButton(onClick = { onComplete(task.id) }, enabled = !saving && canComplete) {
+                        Text(if (canComplete) "完了" else if (task.recurrenceHours != null) "次回まで待機" else "今日完了済み")
                     }
                 }
             }

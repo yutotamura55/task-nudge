@@ -28,11 +28,12 @@ class ReminderEngine(
         override val snapshots = combine(dao.observeTasks(), dao.observeSettings()) { tasks, settings ->
             AppSnapshot(tasks.map { it.snapshot() }, settings.core(), settings.permissionRequested)
         }
-        override suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int): Long {
+        override suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int, recurrenceHours: Int?): Long {
             val input = validateTaskInput(title, recurrenceDays)
+            require(recurrenceHours == null || recurrenceHours in 1..24) { "Recurrence must be 1 to 24 hours" }
             return mutate(id) {
-                if (id == null) dao.insertTask(TaskEntity(title = input.title, recurrenceDays = input.recurrenceDays, createdAt = clock.millis()))
-                else { val task = requireNotNull(dao.task(id)) { "Unknown task" }; dao.updateTask(task.copy(title = input.title, recurrenceDays = input.recurrenceDays)); id }
+                if (id == null) dao.insertTask(TaskEntity(title = input.title, recurrenceDays = input.recurrenceDays, recurrenceHours = recurrenceHours, createdAt = clock.millis()))
+                else { val task = requireNotNull(dao.task(id)) { "Unknown task" }; dao.updateTask(task.copy(title = input.title, recurrenceDays = input.recurrenceDays, recurrenceHours = recurrenceHours)); id }
             }
         }
         override suspend fun saveTasks(inputs: List<TaskInput>): List<Long> {
@@ -78,7 +79,15 @@ class ReminderEngine(
     private suspend fun complete(id: Long) {
         val task = dao.task(id) ?: return
         val now = clock.instant()
-        dao.insertCompletion(CompletionEntity(taskId = id, completedAt = now.toEpochMilli(), localDate = now.atZone(zoneProvider()).toLocalDate().toString()))
+        val today = now.atZone(zoneProvider()).toLocalDate().toString()
+        val completions = dao.taskWithCompletions(id)?.completions.orEmpty()
+        if (task.recurrenceHours == null) {
+            if (completions.any { it.localDate == today }) return
+        } else {
+            val last = completions.maxOfOrNull { it.completedAt }
+            if (last != null && now.isBefore(Instant.ofEpochMilli(last).plus(Duration.ofHours(task.recurrenceHours.toLong())))) return
+        }
+        dao.insertCompletion(CompletionEntity(taskId = id, completedAt = now.toEpochMilli(), localDate = today))
         dao.updateTask(task.copy(snoozedUntil = null))
     }
 
@@ -233,7 +242,7 @@ class ReminderEngine(
 
     private fun TaskWithCompletions.policy(today: LocalDate): ReminderTask {
         val latest = completions.maxByOrNull { it.completedAt }
-        return ReminderTask(task.id, Instant.ofEpochMilli(task.createdAt), task.recurrenceDays, task.archived,
+        return ReminderTask(task.id, Instant.ofEpochMilli(task.createdAt), task.recurrenceDays, task.recurrenceHours, task.archived,
             latest?.completedAt?.let(Instant::ofEpochMilli), latest?.localDate?.let(LocalDate::parse),
             completions.any { it.localDate == today.toString() }, task.snoozedUntil?.let(Instant::ofEpochMilli))
     }

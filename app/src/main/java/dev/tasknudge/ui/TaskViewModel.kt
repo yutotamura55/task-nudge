@@ -65,15 +65,16 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
         }
     }
 
-    fun saveTask(id: Long?, title: String, recurrence: String, sessionId: Long = state.value.operation.sessionId) {
+    fun saveTask(id: Long?, title: String, recurrence: String, sessionId: Long = state.value.operation.sessionId, hourly: Boolean = false) {
         if (!canSubmit(sessionId)) return
         val days = recurrence.toIntOrNull()
         val titleError = if (title.trim().length !in 1..100) "タイトルは1〜100文字で入力してください" else null
-        val recurrenceError = if (days == null || days !in 1..365) "繰り返しは1〜365日の整数で入力してください" else null
+        val recurrenceError = if (days == null || days !in (if (hourly) 1..24 else 1..365))
+            if (hourly) "繰り返しは1〜24時間の整数で入力してください" else "繰り返しは1〜365日の整数で入力してください" else null
         mutableState.update { it.copy(titleError = titleError, recurrenceError = recurrenceError) }
         if (titleError != null || recurrenceError != null) return
-        val input = validateTaskInput(title, days!!)
-        mutate(sessionId) { OperationResult.TaskSaved(repository.saveTask(id, input.title, input.recurrenceDays)) }
+        val input = validateTaskInput(title, if (hourly) 1 else days!!)
+        mutate(sessionId) { OperationResult.TaskSaved(repository.saveTask(id, input.title, input.recurrenceDays, if (hourly) days else null)) }
     }
 
     fun saveTasks(text: String, recurrence: String, sessionId: Long = state.value.operation.sessionId) {

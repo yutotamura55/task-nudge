@@ -7,11 +7,12 @@ data class TaskEntity(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val title: String,
     val recurrenceDays: Int = 1,
+    val recurrenceHours: Int? = null,
     val createdAt: Long,
     val archived: Boolean = false,
     val snoozedUntil: Long? = null,
 )
-@Entity(tableName = "completions", foreignKeys = [ForeignKey(entity = TaskEntity::class, parentColumns = ["id"], childColumns = ["taskId"], onDelete = ForeignKey.CASCADE)], indices = [Index("taskId"), Index(value = ["taskId", "localDate"], unique = true)])
+@Entity(tableName = "completions", foreignKeys = [ForeignKey(entity = TaskEntity::class, parentColumns = ["id"], childColumns = ["taskId"], onDelete = ForeignKey.CASCADE)], indices = [Index("taskId"), Index(value = ["taskId", "localDate", "completedAt"], unique = true)])
 data class CompletionEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val taskId: Long, val completedAt: Long, val localDate: String)
 @Entity(tableName = "reminder_state")
 data class ReminderStateEntity(@PrimaryKey val id: Int = 1, val lastNotifiedAt: Long? = null)

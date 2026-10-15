@@ -109,6 +109,20 @@ class ReminderEngineTest {
         coroutineScope { repeat(10) { launch(Dispatchers.Default) { repo.completeTask(id) } } }
         assertEquals(1, repo.snapshots.first().tasks.single().completions.size)
     }
+    @Test fun hourlyTaskCanNotifyAgainAfterCompletionCooldown() = runTest {
+        repo.saveSettings(ReminderSettings(0, 24, 15))
+        val id = repo.saveTask(null, "水を飲む", recurrenceHours = 2)
+        engine.evaluate()
+        val firstToken = gateway.visibleToken!!
+        engine.handleAction(id, firstToken, ReminderAction.COMPLETE)
+        clock.advance(Duration.ofHours(1))
+        engine.evaluate()
+        assertEquals(1, gateway.posts)
+        clock.advance(Duration.ofHours(1))
+        engine.evaluate()
+        assertEquals(2, gateway.posts)
+        assertEquals(id, gateway.taskId)
+    }
     @Test fun staleActionCannotCompleteOrCancelNewReminder() = runTest {
         val first = repo.saveTask(null, "首"); engine.evaluate()
         val old = gateway.visibleToken!!
