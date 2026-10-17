@@ -1,4 +1,4 @@
-# Task Nudge
+# こつこつタスク
 
 忘れがちな小さな行動を、ひとつずつ思い出すための Android アプリです。[元のアイデア](https://github.com/yutotamura55/my-software-ideas/issues/11)をもとにした個人用 MVP です。アカウント、通信、広告、分析機能はありません。
 
