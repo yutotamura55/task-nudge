@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import androidx.work.*
 import java.time.Duration
 import java.time.Instant
@@ -31,6 +32,14 @@ class AndroidReminderScheduler(private val context: Context) : ReminderScheduler
         val pending = PendingIntent.getBroadcast(
             context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
+        if (Build.VERSION.SDK_INT < 31 || alarmManager.canScheduleExactAlarms()) {
+            try {
+                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), pending)
+                return
+            } catch (_: SecurityException) {
+                // Access can change between the check and the scheduling call.
+            }
+        }
         alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at.toEpochMilli(), pending)
     }
 }

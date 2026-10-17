@@ -35,6 +35,8 @@ fun TaskNudgeApp(
     initialTaskId: Long? = null,
     clock: Clock = Clock.systemUTC(),
     zoneProvider: () -> ZoneId = { ZoneId.systemDefault() },
+    exactAlarmAccessGranted: Boolean = true,
+    onEnableExactAlarm: () -> Unit = {},
 ) {
     val factory = remember(repository) {
         object : ViewModelProvider.Factory {
@@ -139,7 +141,10 @@ fun TaskNudgeApp(
                             TaskEditorScreen(task, state) { title, recurrence, hourly -> vm.saveTask(taskId, title, recurrence, owner, hourly) }
                         }
                         screen == "bulk" -> TaskBulkEditorScreen(state) { text, recurrence -> vm.saveTasks(text, recurrence, owner) }
-                        screen == "settings" -> SettingsScreen(snapshot.settings, snapshot.permissionRequested, notificationsEnabled, state, { if (sessionId == owner) onEnableNotifications() }) { start, end, interval -> vm.saveSettings(start, end, interval, owner) }
+                        screen == "settings" -> SettingsScreen(snapshot.settings, snapshot.permissionRequested, notificationsEnabled, state,
+                            { if (sessionId == owner) onEnableNotifications() },
+                            { start, end, interval -> vm.saveSettings(start, end, interval, owner) },
+                            exactAlarmAccessGranted, { if (sessionId == owner) onEnableExactAlarm() })
                         screen == "detail" && task != null -> {
                             val taskId = task.id
                             TaskDetailScreen(task, !state.canSubmit, now, zone, { navigateFrom(owner, "editor", taskId) }, { vm.completeTask(taskId, owner) }, { vm.setArchived(taskId, it, owner) })

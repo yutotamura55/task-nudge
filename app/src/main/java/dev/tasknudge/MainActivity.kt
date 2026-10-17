@@ -1,10 +1,12 @@
 package dev.tasknudge
 
 import android.Manifest
+import android.app.AlarmManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.net.Uri
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -23,6 +25,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private val container get() = (application as TaskNudgeApplication).container
     private var notificationsEnabled by mutableStateOf(false)
+    private var exactAlarmAccessGranted by mutableStateOf(true)
     private var initialTaskId by mutableStateOf<Long?>(null)
     private var routeRequest by mutableIntStateOf(0)
     private var enabling = false
@@ -33,6 +36,7 @@ class MainActivity : ComponentActivity() {
         initialTaskId = taskId(intent)
         routeRequest = savedInstanceState?.getInt("routeRequest") ?: 0
         notificationsEnabled = container.notificationGateway.canNotify()
+        refreshExactAlarmAccess()
         setContent {
             val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
                 refreshNotifications()
@@ -61,7 +65,15 @@ class MainActivity : ComponentActivity() {
                                 } finally { enabling = false }
                             }
                         }
-                    }, initialTaskId, clock = container.clock, zoneProvider = container.zoneProvider)
+                    }, initialTaskId, clock = container.clock, zoneProvider = container.zoneProvider,
+                        exactAlarmAccessGranted = exactAlarmAccessGranted,
+                        onEnableExactAlarm = {
+                            try {
+                                startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).setData(Uri.parse("package:$packageName")))
+                            } catch (_: Exception) {
+                                Toast.makeText(this@MainActivity, "アラームとリマインダーの設定を開けませんでした。", Toast.LENGTH_LONG).show()
+                            }
+                        })
                 }
             }
         }
@@ -70,6 +82,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         refreshNotifications()
+        refreshExactAlarmAccess()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -93,6 +106,10 @@ class MainActivity : ComponentActivity() {
                 Toast.makeText(this@MainActivity, "通知を確認できませんでした。アプリを開き直してください。", Toast.LENGTH_LONG).show()
             }
         }
+    }
+
+    private fun refreshExactAlarmAccess() {
+        exactAlarmAccessGranted = Build.VERSION.SDK_INT < 31 || getSystemService(AlarmManager::class.java).canScheduleExactAlarms()
     }
 
     private fun taskId(intent: Intent): Long? = intent.getLongExtra("taskId", -1).takeIf { it > 0 }
