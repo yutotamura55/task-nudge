@@ -4,29 +4,30 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    <!-- Clock center (49,52), radius 24; the lower-right arc stops behind the checkbox. -->
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFFFF"
         android:strokeWidth="5"
-        android:pathData="M51,24 A29,29 0,1 0,57 81 M79.5,58 A29,29 0,0 0,51 24" />
+        android:pathData="M49,28 A24,24 0,1 0,57 74.5 M72.5,56 A24,24 0,0 0,49 28" />
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFFFF"
         android:strokeWidth="6"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M40,45 L51,53 L66,41" />
+        android:pathData="M39,45 L49,52 L62,42" />
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="5"
+        android:strokeWidth="4.5"
         android:strokeLineJoin="round"
-        android:pathData="M62,58 L80,58 Q84,58 84,62 L84,80 Q84,84 80,84 L62,84 Q58,84 58,80 L58,62 Q58,58 62,58 Z" />
+        android:pathData="M59,57 L71,57 Q74,57 74,60 L74,72 Q74,75 71,75 L59,75 Q56,75 56,72 L56,60 Q56,57 59,57 Z" />
     <path
         android:fillColor="@android:color/transparent"
         android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="5.5"
+        android:strokeWidth="4"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M64,70 L69,75 L78,65" />
+        android:pathData="M61,66 L65,70 L69,63" />
 </vector>
