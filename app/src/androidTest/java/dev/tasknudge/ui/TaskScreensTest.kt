@@ -68,6 +68,17 @@ class TaskScreensTest {
         dismissKeyboard()
         compose.onNodeWithText(label).performScrollTo().assertIsDisplayed().performClick()
     }
+    @Test fun settingsOfferSleepNotificationAccessWhenItIsUnavailable() {
+        var requests = 0
+        compose.setContent {
+            TaskNudgeTheme(dynamicColor = false) {
+                SettingsScreen(ReminderSettings(9, 21, 30), false, true, TaskUiState(), {}, { _, _, _ -> },
+                    exactAlarmAccessGranted = false, onEnableExactAlarm = { requests++ })
+            }
+        }
+        compose.onNodeWithText("アラームとリマインダーを許可").performClick()
+        compose.runOnIdle { assertEquals(1, requests) }
+    }
     @Test fun fourTasksRemainVisibleWithoutScrollingInACompactList() {
         val tasks = listOf(
             sampleTask(),

@@ -12,13 +12,15 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowAlarmManager
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class)
 class WhileIdleSchedulingTest {
-    @Test fun schedulesWakeupWithoutAlarmClockUiOrExactAlarmPermission() {
+    @Test fun usesExactWakeupOnlyWhenSpecialAccessIsGranted() {
         val context = RuntimeEnvironment.getApplication()
         WorkManager.initialize(context, Configuration.Builder().build())
+        ShadowAlarmManager.setCanScheduleExactAlarms(true)
         val scheduler = AndroidReminderScheduler(context)
         val deadline = Instant.parse("2030-01-01T10:15:00Z")
         scheduler.scheduleWhileIdle(deadline)
@@ -26,7 +28,13 @@ class WhileIdleSchedulingTest {
         assertEquals(AlarmManager.RTC_WAKEUP, alarm.type)
         assertEquals(deadline.toEpochMilli(), alarm.triggerAtTime)
         assertTrue(alarm.allowWhileIdle)
+        assertEquals(0L, alarm.windowLengthMs)
         assertNull(alarm.showIntent)
         assertEquals(ReminderAlarmReceiver::class.java.name, shadowOf(alarm.operation).savedIntent.component!!.className)
+        ShadowAlarmManager.setCanScheduleExactAlarms(false)
+        scheduler.scheduleWhileIdle(deadline.plusSeconds(900))
+        val fallback = requireNotNull(shadowOf(context.getSystemService(AlarmManager::class.java)).nextScheduledAlarm)
+        assertTrue(fallback.allowWhileIdle)
+        assertNotEquals(0L, fallback.windowLengthMs)
     }
 }
