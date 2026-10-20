@@ -14,12 +14,17 @@ import androidx.compose.ui.unit.dp
 import dev.tasknudge.core.ReminderSettings
 
 @Composable
-fun SettingsScreen(settings: ReminderSettings, permissionRequested: Boolean, notificationsEnabled: Boolean, state: TaskUiState, onEnable: () -> Unit, onSave: (String, String, Int) -> Unit) {
+fun SettingsScreen(settings: ReminderSettings, permissionRequested: Boolean, notificationsEnabled: Boolean, state: TaskUiState, onEnable: () -> Unit, onSave: (String, String, Int) -> Unit, exactAlarmAccessGranted: Boolean = true, onEnableExactAlarm: () -> Unit = {}) {
     var start by rememberSaveable { mutableStateOf(settings.startHour.toString()) }
     var end by rememberSaveable { mutableStateOf(settings.endHour.toString()) }
     var interval by rememberSaveable { mutableIntStateOf(settings.intervalMinutes) }
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (!notificationsEnabled) NotificationNotice(permissionRequested, onEnable)
+        if (!exactAlarmAccessGranted) {
+            Text("スリープ中の通知", style = MaterialTheme.typography.titleMedium)
+            Text("予定時刻に近い通知には、Android の「アラームとリマインダー」の許可が必要です。許可しない場合、通知が遅れることがあります。")
+            TextButton(onClick = onEnableExactAlarm) { Text("アラームとリマインダーを許可") }
+        }
         Text("通知する時間", style = MaterialTheme.typography.titleLarge)
         OutlinedTextField(start, { start = it }, modifier = Modifier.fillMaxWidth(), label = { Text("開始（時）") }, singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), isError = state.settingsError != null, supportingText = { Text("0〜23時") })
