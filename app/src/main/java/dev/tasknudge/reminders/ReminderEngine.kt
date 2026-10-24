@@ -89,7 +89,7 @@ class ReminderEngine(
         val task = dao.task(id) ?: return
         val now = clock.instant()
         val today = now.atZone(zoneProvider()).toLocalDate()
-        if (dao.taskWithCompletions(id)?.policy(today)?.canComplete(now) != true) return
+        if (dao.taskWithCompletions(id)?.reminderTask(today)?.canComplete(now) != true) return
         dao.insertCompletion(CompletionEntity(taskId = id, completedAt = now.toEpochMilli(), localDate = today.toString()))
         dao.updateTask(task.copy(snoozedUntil = null))
     }
@@ -116,7 +116,7 @@ class ReminderEngine(
         val tasks = dao.tasks()
         val today = now.atZone(zone).toLocalDate()
         val id = ReminderPolicy.select(
-            tasks.map { it.policy(today) }, now, zone, settings,
+            tasks.map { it.reminderTask(today) }, now, zone, settings,
             dao.state().lastNotifiedAt?.let(Instant::ofEpochMilli), lastByTask,
         ) ?: return
         val task = tasks.first { it.task.id == id }.task
@@ -258,7 +258,7 @@ class ReminderEngine(
     private fun isActiveValid(reminder: ActiveReminderEntity, task: TaskWithCompletions?, now: Instant, zone: ZoneId, settings: ReminderSettings): Boolean {
         val today = now.atZone(zone).toLocalDate()
         return reminder.localDate == today.toString() && task != null &&
-            ReminderPolicy.isWithinHours(now, zone, settings) && task.policy(today).isDue(now, today)
+            ReminderPolicy.isWithinHours(now, zone, settings) && task.reminderTask(today).isDue(now, today)
     }
 
     private fun cancelMatching(reminders: List<ActiveReminderEntity>) {
@@ -269,6 +269,4 @@ class ReminderEngine(
     private fun cancelVisible(reminders: List<ActiveReminderEntity>, os: Map<Int, String>) {
         for (reminder in reminders) if (os[reminder.notificationId] == reminder.token) gateway.cancel(reminder.notificationId)
     }
-
-    private fun TaskWithCompletions.policy(today: LocalDate): ReminderTask = snapshot().reminderTask(today)
 }

@@ -17,3 +17,12 @@ fun TaskSnapshot.reminderTask(today: LocalDate): ReminderTask {
     return ReminderTask(id, createdAt, recurrenceDays, recurrenceHours, archived, latest?.completedAt, latest?.localDate,
         completions.any { it.localDate == today }, snoozedUntil)
 }
+
+/** Same as [TaskSnapshot.reminderTask], parsing only the latest completion for engine checks inside the lock. */
+internal fun TaskWithCompletions.reminderTask(today: LocalDate): ReminderTask {
+    val latest = completions.maxByOrNull { it.completedAt }
+    val todayText = today.toString()
+    return ReminderTask(task.id, Instant.ofEpochMilli(task.createdAt), task.recurrenceDays, task.recurrenceHours, task.archived,
+        latest?.completedAt?.let(Instant::ofEpochMilli), latest?.localDate?.let(LocalDate::parse),
+        completions.any { it.localDate == todayText }, task.snoozedUntil?.let(Instant::ofEpochMilli))
+}

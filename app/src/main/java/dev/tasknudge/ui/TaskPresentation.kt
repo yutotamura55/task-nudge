@@ -16,7 +16,7 @@ fun taskStatus(task: TaskSnapshot, now: Instant, zone: ZoneId): String {
     val rules = task.reminderTask(today)
     if (!rules.canComplete(now)) return rules.nextCompletableAt?.let { "次回対象 ${formatDateTime(it, zone)}" } ?: "今日完了"
     rules.nextDueDate?.takeIf { it.isAfter(today) }?.let { return "次回対象日 $it" }
-    if (rules.isSnoozed(now)) return "保留中・${formatDateTime(task.snoozedUntil!!, zone)}まで"
+    task.snoozedUntil?.takeIf { rules.isSnoozed(now) }?.let { return "保留中・${formatDateTime(it, zone)}まで" }
     return "実行できます"
 }
 
