@@ -614,7 +614,7 @@ class TaskScreensTest {
 
 private fun listContent(tasks: List<TaskSnapshot>) = TaskListContent(
     tasks = tasks, showArchived = false, query = "", notificationsEnabled = true, permissionRequested = false,
-    saving = false, now = Instant.parse("2026-10-01T10:00:00Z"), zone = ZoneId.of("Asia/Tokyo"),
+    canSubmit = true, now = Instant.parse("2026-10-01T10:00:00Z"), zone = ZoneId.of("Asia/Tokyo"),
 )
 private fun listActions(onOpenTask: (Long) -> Unit = {}) =
     TaskListActions(onShowArchived = {}, onQueryChange = {}, onEnableNotifications = {}, onOpenTask = onOpenTask, onComplete = {})
