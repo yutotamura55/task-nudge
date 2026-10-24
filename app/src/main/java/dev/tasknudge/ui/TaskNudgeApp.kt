@@ -45,18 +45,18 @@ fun TaskNudgeApp(
         }
     }
     val vm: TaskViewModel = viewModel(factory = factory)
-    var screen by rememberSaveable { mutableStateOf(if (initialTaskId == null) "list" else "detail") }
-    var selectedId by rememberSaveable { mutableStateOf(initialTaskId) }
+    var route by rememberSaveable(stateSaver = Route.saver) {
+        mutableStateOf(if (initialTaskId == null) Route.TaskList else Route.Detail(initialTaskId))
+    }
     var routedTaskId by rememberSaveable { mutableStateOf(initialTaskId) }
     var sessionId by rememberSaveable { mutableLongStateOf(vm.beginScreenSession()) }
     // A retained ViewModel keeps its operation on rotation; a new ViewModel after
     // process recreation adopts the restored route's owner before receiving input.
     remember(vm, sessionId) { vm.beginScreenSession(sessionId) }
     val state by vm.state.collectAsStateWithLifecycle()
-    fun navigate(destination: String, id: Long? = selectedId) {
+    fun navigate(destination: Route) {
         sessionId = vm.beginScreenSession()
-        selectedId = id
-        screen = destination
+        route = destination
     }
     var showArchived by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -70,54 +70,51 @@ fun TaskNudgeApp(
     val zone = zoneProvider()
     LaunchedEffect(initialTaskId) {
         if (initialTaskId != null && initialTaskId != routedTaskId) {
-            routedTaskId = initialTaskId; navigate("detail", initialTaskId)
+            routedTaskId = initialTaskId; navigate(Route.Detail(initialTaskId))
         }
     }
     val snapshot = state.snapshot
-    val task = snapshot?.tasks?.find { it.id == selectedId }
-    LaunchedEffect(screen, selectedId, state.observation) {
-        if (state.observation.status == ObservationStatus.Ready && selectedId != null && task == null && (screen == "detail" || screen == "editor")) {
-            navigate("list", null)
+    val task = route.requiredTaskId?.let { id -> snapshot?.tasks?.find { it.id == id } }
+    LaunchedEffect(route, state.observation) {
+        if (state.observation.status == ObservationStatus.Ready && route.requiredTaskId != null && task == null) {
+            navigate(Route.TaskList)
         }
     }
     LaunchedEffect(state.operation, snapshot, sessionId) {
         if (state.operation.sessionId == sessionId && vm.state.value.operation.sessionId == sessionId) {
             when (val result = (state.operation.state as? OperationState.Committed)?.result) {
-                is OperationResult.TaskSaved -> if (screen == "editor" && snapshot?.tasks?.any { it.id == result.id } == true) navigate("detail", result.id)
-                is OperationResult.TasksSaved -> if (screen == "bulk") navigate("list", null)
-                OperationResult.SettingsSaved -> if (screen == "settings") navigate("list")
+                is OperationResult.TaskSaved -> if (route is Route.Editor && snapshot?.tasks?.any { it.id == result.id } == true) navigate(Route.Detail(result.id))
+                is OperationResult.TasksSaved -> if (route == Route.Bulk) navigate(Route.TaskList)
+                OperationResult.SettingsSaved -> if (route == Route.Settings) navigate(Route.TaskList)
                 OperationResult.Updated -> vm.consumeOperation(sessionId)
                 null -> Unit
             }
         }
     }
+    // Callbacks capture the session that created them. After navigation, a late
+    // tap from the previous screen must not act on the newly shown screen.
     val owner = sessionId
-    val shownScreen = screen
-    val shownTaskId = selectedId
-    fun navigateFrom(ownerId: Long, destination: String, id: Long?) {
-        if (sessionId == ownerId) navigate(destination, id)
-    }
-    fun backFrom(ownerId: Long, source: String, taskId: Long?) {
-        navigateFrom(ownerId, if (source == "editor" && taskId != null) "detail" else "list", taskId)
-    }
-    BackHandler(enabled = screen != "list") { backFrom(owner, shownScreen, shownTaskId) }
+    val shownRoute = route
+    fun fromOwner(action: () -> Unit) { if (sessionId == owner) action() }
+    fun navigateFromOwner(destination: Route) = fromOwner { navigate(destination) }
+    BackHandler(enabled = route != Route.TaskList) { navigateFromOwner(shownRoute.back) }
     Scaffold(
         modifier = Modifier.fillMaxSize().imePadding(),
         contentWindowInsets = WindowInsets.safeDrawing,
         topBar = {
-            TopAppBar(title = { Text(when (screen) { "editor" -> if (selectedId == null) "タスクを追加" else "タスクを編集"; "bulk" -> "まとめて追加"; "detail" -> "タスクの詳細"; "settings" -> "通知設定"; else -> "タスク" }) },
+            TopAppBar(title = { Text(route.title) },
                 navigationIcon = {
-                    if (screen != "list") TextButton(onClick = { backFrom(owner, shownScreen, shownTaskId) }, modifier = Modifier.semantics { contentDescription = "戻る" }) { Text("戻る") }
+                    if (route != Route.TaskList) TextButton(onClick = { navigateFromOwner(shownRoute.back) }, modifier = Modifier.semantics { contentDescription = "戻る" }) { Text("戻る") }
                 },
                 actions = {
-                    if (screen == "list") {
-                        TextButton(onClick = { navigateFrom(owner, "bulk", null) }, modifier = Modifier.semantics { contentDescription = "まとめて追加" }) { Text("まとめて追加") }
-                        TextButton(onClick = { navigateFrom(owner, "settings", shownTaskId) }, modifier = Modifier.semantics { contentDescription = "通知設定" }) { Text("設定") }
+                    if (route == Route.TaskList) {
+                        TextButton(onClick = { navigateFromOwner(Route.Bulk) }, modifier = Modifier.semantics { contentDescription = "まとめて追加" }) { Text("まとめて追加") }
+                        TextButton(onClick = { navigateFromOwner(Route.Settings) }, modifier = Modifier.semantics { contentDescription = "通知設定" }) { Text("設定") }
                     }
                 })
         },
         floatingActionButton = {
-            if (screen == "list" && snapshot != null) FloatingActionButton(onClick = { navigateFrom(owner, "editor", null) }, modifier = Modifier.semantics { contentDescription = "タスクを追加" }) { Text("＋", style = MaterialTheme.typography.headlineSmall) }
+            if (route == Route.TaskList && snapshot != null) FloatingActionButton(onClick = { navigateFromOwner(Route.Editor(null)) }, modifier = Modifier.semantics { contentDescription = "タスクを追加" }) { Text("＋", style = MaterialTheme.typography.headlineSmall) }
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
@@ -132,25 +129,47 @@ fun TaskNudgeApp(
                 }
                 // Keep an existing screen/draft visible during read retry or failure.
                 key(sessionId) {
+                    val screen = route
                     when {
                         snapshot == null && state.loading -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.semantics { contentDescription = "読み込み中" }) }
                         snapshot == null -> Text("データを表示できません。再読み込みしてください。", modifier = Modifier.padding(16.dp))
-                        screen == "editor" -> {
-                            val taskId = shownTaskId
+                        screen is Route.Editor -> {
                             val savedId = ((state.operation.state as? OperationState.Committed)?.result as? OperationResult.TaskSaved)?.id
                             if (savedId != null && snapshot.tasks.none { it.id == savedId }) Text("保存済み・データ表示待ち", modifier = Modifier.padding(16.dp))
-                            TaskEditorScreen(task, state) { title, recurrence, hourly -> vm.saveTask(taskId, title, recurrence, owner, hourly) }
+                            TaskEditorScreen(task, state) { title, recurrence, hourly -> vm.saveTask(screen.taskId, title, recurrence, owner, hourly) }
                         }
-                        screen == "bulk" -> TaskBulkEditorScreen(state) { text, recurrence -> vm.saveTasks(text, recurrence, owner) }
-                        screen == "settings" -> SettingsScreen(snapshot.settings, snapshot.permissionRequested, notificationsEnabled, state,
-                            { if (sessionId == owner) onEnableNotifications() },
-                            { start, end, interval -> vm.saveSettings(start, end, interval, owner) },
-                            exactAlarmAccessGranted, { if (sessionId == owner) onEnableExactAlarm() })
-                        screen == "detail" && task != null -> {
-                            val taskId = task.id
-                            TaskDetailScreen(task, !state.canSubmit, now, zone, { navigateFrom(owner, "editor", taskId) }, { vm.completeTask(taskId, owner) }, { vm.setArchived(taskId, it, owner) })
-                        }
-                        else -> TaskListScreen(snapshot.tasks, showArchived, { if (sessionId == owner) showArchived = it }, searchQuery, { if (sessionId == owner) searchQuery = it }, notificationsEnabled, snapshot.permissionRequested, { if (sessionId == owner) onEnableNotifications() }, !state.canSubmit, now, zone, { navigateFrom(owner, "detail", it) }, { vm.completeTask(it, owner) })
+                        screen == Route.Bulk -> TaskBulkEditorScreen(state) { text, recurrence -> vm.saveTasks(text, recurrence, owner) }
+                        screen == Route.Settings -> SettingsScreen(
+                            SettingsContent(
+                                settings = snapshot.settings, permissionRequested = snapshot.permissionRequested,
+                                notificationsEnabled = notificationsEnabled, exactAlarmAccessGranted = exactAlarmAccessGranted,
+                            ),
+                            state,
+                            SettingsActions(
+                                onEnableNotifications = { fromOwner(onEnableNotifications) },
+                                onSave = { start, end, interval -> vm.saveSettings(start, end, interval, owner) },
+                                onEnableExactAlarm = { fromOwner(onEnableExactAlarm) },
+                            ),
+                        )
+                        screen is Route.Detail && task != null -> TaskDetailScreen(task, !state.canSubmit, now, zone, TaskDetailActions(
+                            onEdit = { navigateFromOwner(Route.Editor(screen.taskId)) },
+                            onComplete = { vm.completeTask(screen.taskId, owner) },
+                            onArchive = { vm.setArchived(screen.taskId, it, owner) },
+                        ))
+                        else -> TaskListScreen(
+                            TaskListContent(
+                                tasks = snapshot.tasks, showArchived = showArchived, query = searchQuery,
+                                notificationsEnabled = notificationsEnabled, permissionRequested = snapshot.permissionRequested,
+                                saving = !state.canSubmit, now = now, zone = zone,
+                            ),
+                            TaskListActions(
+                                onShowArchived = { fromOwner { showArchived = it } },
+                                onQueryChange = { fromOwner { searchQuery = it } },
+                                onEnableNotifications = { fromOwner(onEnableNotifications) },
+                                onOpenTask = { navigateFromOwner(Route.Detail(it)) },
+                                onComplete = { vm.completeTask(it, owner) },
+                            ),
+                        )
                     }
                 }
             }
