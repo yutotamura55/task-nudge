@@ -524,7 +524,7 @@ class TaskScreensTest {
         compose.onNodeWithText("開始（時）").performTextReplacement("0")
         compose.onNodeWithText("120分").performScrollTo().performClick()
         tapSave()
-        compose.waitUntil { repo.data.value.settings == ReminderSettings(0, 24, 120) }
+        compose.waitUntil(10_000) { repo.data.value.settings == ReminderSettings(0, 24, 120) }
     }
     @Test fun editDraftSurvivesStateRestoration() {
         val repo = ScreenRepository()

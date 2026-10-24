@@ -201,6 +201,14 @@ class TaskViewModelTest {
         assertEquals(ReminderSettings(0, 24, 120), repo.settings.single())
         assertTrue(vm.settingsSaved)
     }
+    @Test fun settingsAcceptFiveAndTenMinuteIntervals() = runTest(dispatcher) {
+        for (minutes in listOf(5, 10)) {
+            val repo = FakeRepository(); val vm = TaskViewModel(repo)
+            vm.saveSettings("9", "21", minutes); runCurrent()
+            assertNull(vm.state.value.settingsError)
+            assertEquals(ReminderSettings(9, 21, minutes), repo.settings.single())
+        }
+    }
     @Test fun readRetryRecoversCommittedTaskAndKeepsOneSubscription() = runTest(dispatcher) {
         val repo = FakeRepository().apply { publishSaves = false }
         val vm = TaskViewModel(repo)
