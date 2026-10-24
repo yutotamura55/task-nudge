@@ -23,4 +23,4 @@ After bootstrap, run `scripts/check.sh` for core tests, app unit tests, lint and
 
 Use `scripts/device-smoke.sh` for connected Android instrumentation tests. GitHub Actions runs API35 emulator verification and exports test reports, screenshots and a debug APK. Inspect CI results and fix failures within scope before reporting completion. State any unexecuted device/OEM checks honestly.
 
-Local provisioned toolchain, when present: `source /tmp/task-nudge-toolchain/environment.sh`. Other machines may use Android Studio/SDK plus JDK17 and the checked-in Gradle wrapper. Local paths are not project configuration.
+Without a host JDK17 and Android SDK, run `scripts/container-check.sh` (Docker) for the same checks; see `docs/testing.md`. Device and emulator tests, adb, and installs to an everyday device run on the host, because the container's debug signing key differs from the host key. Other machines may use Android Studio/SDK plus JDK17 and the checked-in Gradle wrapper. Local paths are not project configuration.
