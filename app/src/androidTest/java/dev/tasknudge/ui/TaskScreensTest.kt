@@ -90,7 +90,7 @@ class TaskScreensTest {
         compose.setContent {
             TaskNudgeTheme(dynamicColor = false) {
                 Box(Modifier.size(360.dp, 560.dp)) {
-                    TaskListScreen(tasks, false, {}, true, false, {}, false,
+                    TaskListScreen(tasks, false, {}, "", {}, true, false, {}, false,
                         Instant.parse("2026-10-01T10:00:00Z"), ZoneId.of("Asia/Tokyo"),
                         { openedTask = it }, {})
                 }
@@ -99,13 +99,42 @@ class TaskScreensTest {
         compose.onNodeWithText("腰").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(4L, openedTask) }
     }
+    @Test fun searchingTaskTitlesFiltersListAndKeepsQueryAfterOpeningDetail() {
+        val repo = ScreenRepository(listOf(
+            sampleTask().copy(id = 1, title = "首のストレッチ"),
+            sampleTask().copy(id = 2, title = "肩の運動"),
+            sampleTask().copy(id = 3, title = "腕のストレッチ"),
+        ))
+        launch(repo)
+        compose.onNodeWithText("検索").performClick()
+        compose.onNodeWithText("タスクを検索").performTextInput("ストレッチ")
+        compose.onNodeWithText("検索結果 2件").assertIsDisplayed()
+        compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
+        compose.onNodeWithText("腕のストレッチ").assertIsDisplayed()
+        compose.onNodeWithText("肩の運動").assertDoesNotExist()
+        compose.onNodeWithText("首のストレッチ").performClick()
+        compose.onNodeWithContentDescription("戻る").performClick()
+        compose.onNodeWithText("肩の運動").assertDoesNotExist()
+        compose.onNodeWithText("タスクを検索").assertTextContains("ストレッチ")
+    }
+    @Test fun searchShowsNoResultsAndClearingRestoresTasks() {
+        val repo = ScreenRepository(listOf(sampleTask().copy(title = "首のストレッチ")))
+        launch(repo)
+        compose.onNodeWithText("検索").performClick()
+        compose.onNodeWithText("タスクを検索").performTextInput("肩")
+        compose.onNodeWithText("検索結果 0件").assertIsDisplayed()
+        compose.onNodeWithText("一致するタスクがありません").assertIsDisplayed()
+        compose.onNodeWithText("首のストレッチ").assertDoesNotExist()
+        compose.onNodeWithText("タスクを検索").performTextClearance()
+        compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
+    }
     @Test fun largeTextKeepsTaskNameReadableWithCompletionAction() {
         val title = "首と肩のストレッチをゆっくり丁寧に続ける"
         compose.setContent {
             TaskNudgeTheme(dynamicColor = false) {
                 CompositionLocalProvider(LocalDensity provides Density(1f, 2f)) {
                     Box(Modifier.size(360.dp, 560.dp)) {
-                        TaskListScreen(listOf(sampleTask().copy(title = title)), false, {}, true, false, {}, false,
+                        TaskListScreen(listOf(sampleTask().copy(title = title)), false, {}, "", {}, true, false, {}, false,
                             Instant.parse("2026-10-01T10:00:00Z"), ZoneId.of("Asia/Tokyo"), {}, {})
                     }
                 }
