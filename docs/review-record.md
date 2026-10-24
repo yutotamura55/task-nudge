@@ -216,3 +216,4 @@ source `6d4db8f` のPR CI `36963062421`・push CI `36963059186` はともにSUCC
 - `TaskListScreen` のタスク行を `TaskRow` に分けた。一覧と詳細に渡す `saving = !state.canSubmit` を `canSubmit` に直した。`TaskSnapshot` と `ReminderTask` の変換を名前付き引数にした。
 - detekt（同じ設定）の変化：`TaskNudgeApp` は認知的複雑度 56→40、循環的 31→24、126→103 行。`TaskListScreen` は認知的 43→27、`LongMethod` の指摘は解消。新しく `TaskRow` が引数 6 で `LongParameterList` の閾値に並んだ（タスク・操作可否・時刻・タイムゾーン・2つの操作で、まとめる利点は小さい）。`TaskNudgeApp` と `TaskListScreen` は閾値（15）を超えたままで、残りは画面の振り分けと検索の開閉という画面の流れそのもの。#41 でベースラインに記録する。
 - `scripts/container-check.sh` で core・app の単体テスト計143件が失敗・スキップなし。lint は既存の警告のみ、debug APK と計装テスト用 APK のビルドも成功。端末テストは PR の CI で確認する。
+- 全差分を Codex CLI 0.164.0 の `gpt-6.1-sol`（推論 high、`--sandbox read-only`）でレビューした。モデルはセッション記録で確認した。指摘は0件。抽出したコールバックが元の session（`owner`）を保持していること、時刻の更新の開始と停止が変わらないこと、名前付き引数が元の位置と対応していることが確認され、トップバーとタスク行の分離は読む負担を減らしていると評価された。
