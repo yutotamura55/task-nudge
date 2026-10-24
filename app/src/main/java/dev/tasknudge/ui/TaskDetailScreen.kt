@@ -12,9 +12,9 @@ import java.time.Instant
 import java.time.ZoneId
 
 class TaskDetailActions(
-    val onEdit: () -> Unit = {},
-    val onComplete: () -> Unit = {},
-    val onArchive: (Boolean) -> Unit = {},
+    val onEdit: () -> Unit,
+    val onComplete: () -> Unit,
+    val onArchive: (Boolean) -> Unit,
 )
 
 @Composable

@@ -22,10 +22,10 @@ data class SettingsContent(
 )
 
 class SettingsActions(
-    val onEnableNotifications: () -> Unit = {},
+    val onEnableNotifications: () -> Unit,
     /** Receives the entered start and end hours as typed, and the selected interval in minutes. */
-    val onSave: (String, String, Int) -> Unit = { _, _, _ -> },
-    val onEnableExactAlarm: () -> Unit = {},
+    val onSave: (String, String, Int) -> Unit,
+    val onEnableExactAlarm: () -> Unit,
 )
 
 @Composable

@@ -36,11 +36,11 @@ data class TaskListContent(
 )
 
 class TaskListActions(
-    val onShowArchived: (Boolean) -> Unit = {},
-    val onQueryChange: (String) -> Unit = {},
-    val onEnableNotifications: () -> Unit = {},
-    val onOpenTask: (Long) -> Unit = {},
-    val onComplete: (Long) -> Unit = {},
+    val onShowArchived: (Boolean) -> Unit,
+    val onQueryChange: (String) -> Unit,
+    val onEnableNotifications: () -> Unit,
+    val onOpenTask: (Long) -> Unit,
+    val onComplete: (Long) -> Unit,
 )
 
 @Composable
@@ -147,7 +147,7 @@ private fun TaskListPreview() {
         Surface { TaskListScreen(
             TaskListContent(tasks = emptyList(), showArchived = false, query = "", notificationsEnabled = false,
                 permissionRequested = false, saving = false, now = Instant.now(), zone = ZoneId.systemDefault()),
-            TaskListActions(),
+            TaskListActions(onShowArchived = {}, onQueryChange = {}, onEnableNotifications = {}, onOpenTask = {}, onComplete = {}),
         ) }
     }
 }
