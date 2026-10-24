@@ -22,16 +22,19 @@ ENV PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$PATH
 # compileSdk 36 and the Build-Tools version AGP 8.13 uses by default. The SDK is
 # read-only for the build user, so a missing package fails the build instead of
 # being downloaded into a throwaway container on every run.
+# sdkmanager cannot pin a platform revision, so a newer one fails the build here
+# instead of silently changing android.jar between fresh and cached images.
+ARG PLATFORM_REVISION=2
 RUN yes | sdkmanager --licenses >/dev/null \
- && sdkmanager "platforms;android-36" "build-tools;35.0.0" >/dev/null
+ && sdkmanager "platforms;android-36" "build-tools;35.0.0" >/dev/null \
+ && grep -qx "Pkg.Revision=$PLATFORM_REVISION" "$ANDROID_HOME/platforms/android-36/source.properties" \
+ && grep -qx "Pkg.Revision=35.0.0" "$ANDROID_HOME/build-tools/35.0.0/source.properties"
 
 # The build runs as the host user, so generated files stay theirs. That UID has
 # no passwd entry, and Java would otherwise resolve user.home to "?", which breaks
 # Robolectric's download lock. HOME also keeps Robolectric's Android jars, so it
-# lives in the cache volume. The mount point is world-writable so that a new named
-# volume inherits that mode.
+# lives in the cache volume, which scripts/container-check.sh gives to that user.
 ENV GRADLE_USER_HOME=/cache/gradle \
     HOME=/cache/home \
     JAVA_TOOL_OPTIONS=-Duser.home=/cache/home
-RUN mkdir -p /cache/gradle /cache/home && chmod -R 1777 /cache
 WORKDIR /work
