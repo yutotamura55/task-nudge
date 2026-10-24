@@ -22,7 +22,7 @@ fun TaskDetailScreen(task: TaskSnapshot, saving: Boolean, now: Instant, zone: Zo
         }
         item {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!task.archived) Button(onClick = onComplete, enabled = !saving && canComplete, modifier = Modifier.fillMaxWidth()) { Text(if (canComplete) "完了" else if (task.recurrenceHours != null) "次回まで待機" else "今日完了済み") }
+                if (!task.archived) Button(onClick = onComplete, enabled = !saving && canComplete, modifier = Modifier.fillMaxWidth()) { Text(completeActionLabel(task, canComplete)) }
                 OutlinedButton(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text("編集") }
                 TextButton(onClick = { onArchive(!task.archived) }, enabled = !saving, modifier = Modifier.fillMaxWidth()) { Text(if (task.archived) "再開する" else "停止する") }
                 Text("停止しても実行履歴は残ります。", style = MaterialTheme.typography.bodySmall)
@@ -32,7 +32,7 @@ fun TaskDetailScreen(task: TaskSnapshot, saving: Boolean, now: Instant, zone: Zo
         if (task.completions.isEmpty()) item { Text("まだ実行履歴がありません。") }
         items(task.completions.sortedByDescending { it.completedAt }, key = { it.id }) { record ->
             ListItem(headlineContent = { Text(if (task.recurrenceHours != null)
-                record.completedAt.atZone(zone).format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))
+                formatDateTime(record.completedAt, zone)
                 else record.localDate.toString()) }, supportingContent = { Text("完了") })
             HorizontalDivider()
         }

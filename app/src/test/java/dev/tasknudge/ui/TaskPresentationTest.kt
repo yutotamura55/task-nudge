@@ -46,5 +46,25 @@ class TaskPresentationTest {
         assertEquals(listOf(1L), visibleTasks(tasks, false, "ストレッチ").map { it.id })
         assertEquals(listOf(1L, 2L), visibleTasks(tasks, true, "ストレッチ").map { it.id })
     }
+    @Test fun dailyTaskCanBeCompletedOnTheNextDateBeforeItsRecurrenceIsDue() {
+        val yesterday = task.copy(completions = listOf(record("2026-09-30")))
+        assertTrue(taskCanComplete(yesterday, now, zone))
+        assertEquals("次回対象日 2026-10-03", taskStatus(yesterday, now, zone))
+        val today = task.copy(completions = listOf(record("2026-10-01")))
+        assertFalse(taskCanComplete(today, now, zone))
+        assertFalse(taskCanComplete(today.copy(archived = true), now, zone))
+        assertEquals("実行できます", taskStatus(task.copy(completions = listOf(record("2026-09-28"))), now, zone))
+    }
+    @Test fun hourlyTaskBecomesReadyExactlyAtItsInterval() {
+        val completed = CompletionRecord(1, now.minus(Duration.ofHours(2)), LocalDate.parse("2026-10-01"))
+        val hourly = task.copy(recurrenceHours = 2, completions = listOf(completed))
+        assertTrue(taskCanComplete(hourly, now, zone))
+        assertEquals("実行できます", taskStatus(hourly, now, zone))
+        assertFalse(taskCanComplete(hourly, now.minusSeconds(1), zone))
+    }
+    @Test fun snoozeEndsExactlyAtItsDeadline() {
+        assertEquals("実行できます", taskStatus(task.copy(snoozedUntil = now), now, zone))
+        assertTrue(taskCanComplete(task.copy(snoozedUntil = now.plusSeconds(3600)), now, zone))
+    }
     private fun record(day: String) = CompletionRecord(1, Instant.EPOCH, LocalDate.parse(day))
 }

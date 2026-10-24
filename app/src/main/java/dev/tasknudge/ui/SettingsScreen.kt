@@ -11,8 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import dev.tasknudge.core.ReminderSettings
-import dev.tasknudge.core.notificationIntervalOptions
+import dev.tasknudge.core.*
 
 @Composable
 fun SettingsScreen(settings: ReminderSettings, permissionRequested: Boolean, notificationsEnabled: Boolean, state: TaskUiState, onEnable: () -> Unit, onSave: (String, String, Int) -> Unit, exactAlarmAccessGranted: Boolean = true, onEnableExactAlarm: () -> Unit = {}) {
@@ -28,9 +27,9 @@ fun SettingsScreen(settings: ReminderSettings, permissionRequested: Boolean, not
         }
         Text("通知する時間", style = MaterialTheme.typography.titleLarge)
         OutlinedTextField(start, { start = it }, modifier = Modifier.fillMaxWidth(), label = { Text("開始（時）") }, singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), isError = state.settingsError != null, supportingText = { Text("0〜23時") })
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), isError = state.settingsError != null, supportingText = { Text("${startHourRange.first}〜${startHourRange.last}時") })
         OutlinedTextField(end, { end = it }, modifier = Modifier.fillMaxWidth(), label = { Text("終了（時）") }, singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), isError = state.settingsError != null, supportingText = { Text("1〜24時。終了時刻は含みません。24時は一日の終わりです。") })
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), isError = state.settingsError != null, supportingText = { Text("${endHourRange.first}〜${endHourRange.last}時。終了時刻は含みません。24時は一日の終わりです。") })
         Text("通知の間隔", style = MaterialTheme.typography.titleMedium)
         // Wrap chips on narrow screens or when fonts are enlarged.
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
