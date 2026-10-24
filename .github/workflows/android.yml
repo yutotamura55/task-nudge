@@ -3,7 +3,7 @@ name: Android
 on:
   pull_request:
   push:
-    branches: [main, 'feat/**', 'fix/**', 'chore/**']
+    branches: [main]
 
 permissions:
   contents: read
@@ -46,7 +46,6 @@ jobs:
           if-no-files-found: warn
 
   android-device-tests:
-    needs: verify
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
