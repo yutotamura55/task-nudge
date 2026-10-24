@@ -10,6 +10,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import dev.tasknudge.core.*
 import dev.tasknudge.data.TaskSnapshot
 
 @Composable
@@ -22,7 +23,7 @@ fun TaskEditorScreen(task: TaskSnapshot?, state: TaskUiState, onSave: (String, S
         Text("タイトルだけで追加できます。思い出したい行動をひとつ。", style = MaterialTheme.typography.bodyLarge)
         OutlinedTextField(value = title, onValueChange = { title = it }, label = { Text("タイトル") },
             modifier = Modifier.fillMaxWidth(), isError = state.titleError != null,
-            supportingText = { Text(state.titleError ?: "前後の空白を除き1〜100文字") })
+            supportingText = { Text(state.titleError ?: "前後の空白を除き${titleLengthRange.first}〜${titleLengthRange.last}文字") })
         TextButton(onClick = { showRecurrence = !showRecurrence }) { Text(if (showRecurrence) "繰り返しを閉じる" else "繰り返しを設定") }
         if (showRecurrence) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -31,7 +32,7 @@ fun TaskEditorScreen(task: TaskSnapshot?, state: TaskUiState, onSave: (String, S
             }
             OutlinedTextField(value = recurrence, onValueChange = { recurrence = it }, label = { Text(if (hourly) "繰り返し（時間）" else "繰り返し（日）") },
                 modifier = Modifier.fillMaxWidth(), singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                isError = state.recurrenceError != null, supportingText = { Text(state.recurrenceError ?: if (hourly) "1〜24時間。最後の完了時刻から数えます。" else "1〜365日。最後に完了した日から数えます。") })
+                isError = state.recurrenceError != null, supportingText = { Text(state.recurrenceError ?: if (hourly) "${hourlyRecurrenceRange.first}〜${hourlyRecurrenceRange.last}時間。最後の完了時刻から数えます。" else "${dailyRecurrenceRange.first}〜${dailyRecurrenceRange.last}日。最後に完了した日から数えます。") })
         } else {
             Text("繰り返し：${recurrence}${if (hourly) "時間" else "日"}ごと", style = MaterialTheme.typography.bodyMedium)
             state.recurrenceError?.let { Text(it, color = MaterialTheme.colorScheme.error) }

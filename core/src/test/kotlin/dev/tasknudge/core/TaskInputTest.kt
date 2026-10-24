@@ -57,4 +57,17 @@ class TaskInputTest {
             assertThrows(IllegalArgumentException::class.java) { validateSettings(ReminderSettings(intervalMinutes = minutes)) }
         }
     }
+
+    @Test fun inputErrorsIdentifyTheRejectedField() {
+        assertEquals(InputError.TITLE_LENGTH, titleError(" "))
+        assertEquals(null, recurrenceError(24, hourly = true))
+        assertEquals(InputError.HOURLY_RECURRENCE, recurrenceError(25, hourly = true))
+        assertEquals(InputError.DAILY_RECURRENCE, recurrenceError(null))
+        assertEquals(listOf("首", "腕"), bulkTitles(" 首 \n\n腕"))
+        assertEquals(InputError.BULK_EMPTY, bulkTitlesError(bulkTitles(" \n")))
+        assertEquals(InputError.BULK_TOO_MANY, bulkTitlesError(List(101) { "首" }))
+        assertEquals(InputError.BULK_TITLE_LENGTH, bulkTitlesError(listOf("首", "あ".repeat(101))))
+        assertEquals(null, settingsError(ReminderSettings(0, 24, 5)))
+        assertEquals(InputError.SETTINGS, settingsError(ReminderSettings(21, 9)))
+    }
 }

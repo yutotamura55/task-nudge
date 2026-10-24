@@ -21,38 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import dev.tasknudge.data.TaskSnapshot
 import java.time.Instant
-import java.time.Duration
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-
-fun taskStatus(task: TaskSnapshot, now: Instant, zone: ZoneId): String {
-    if (task.archived) return "停止中"
-    val today = now.atZone(zone).toLocalDate()
-    val last = task.completions.maxByOrNull { it.completedAt }
-    if (task.recurrenceHours != null) {
-        val next = last?.completedAt?.plus(Duration.ofHours(task.recurrenceHours.toLong()))
-        if (next != null && now.isBefore(next)) return "次回対象 ${next.atZone(zone).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))}"
-    } else {
-        if (task.completions.any { it.localDate == today }) return "今日完了"
-        val next = last?.localDate?.plusDays(task.recurrenceDays.toLong())
-        if (next != null && next.isAfter(today)) return "次回対象日 $next"
-    }
-    if (task.snoozedUntil?.isAfter(now) == true) return "保留中・${task.snoozedUntil.atZone(zone).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"))}まで"
-    return "実行できます"
-}
-
-fun taskCanComplete(task: TaskSnapshot, now: Instant, zone: ZoneId): Boolean {
-    if (task.archived) return false
-    val last = task.completions.maxByOrNull { it.completedAt }
-    return if (task.recurrenceHours != null)
-        last == null || !now.isBefore(last.completedAt.plus(Duration.ofHours(task.recurrenceHours.toLong())))
-    else task.completions.none { it.localDate == now.atZone(zone).toLocalDate() }
-}
-
-fun visibleTasks(tasks: List<TaskSnapshot>, showArchived: Boolean, query: String): List<TaskSnapshot> {
-    val keyword = query.trim()
-    return tasks.filter { (showArchived || !it.archived) && it.title.contains(keyword, ignoreCase = true) }
-}
 
 @Composable
 fun TaskListScreen(
@@ -119,7 +88,7 @@ fun TaskListScreen(
             val completeAction: @Composable () -> Unit = {
                 if (!task.archived) {
                     TextButton(onClick = { onComplete(task.id) }, enabled = !saving && canComplete) {
-                        Text(if (canComplete) "完了" else if (task.recurrenceHours != null) "次回まで待機" else "今日完了済み")
+                        Text(completeActionLabel(task, canComplete))
                     }
                 }
             }
