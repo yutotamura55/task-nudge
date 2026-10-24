@@ -23,32 +23,46 @@ import dev.tasknudge.data.TaskSnapshot
 import java.time.Instant
 import java.time.ZoneId
 
+/** What the task list shows. */
+data class TaskListContent(
+    val tasks: List<TaskSnapshot>,
+    val showArchived: Boolean,
+    val query: String,
+    val notificationsEnabled: Boolean,
+    val permissionRequested: Boolean,
+    val saving: Boolean,
+    val now: Instant,
+    val zone: ZoneId,
+)
+
+class TaskListActions(
+    val onShowArchived: (Boolean) -> Unit,
+    val onQueryChange: (String) -> Unit,
+    val onEnableNotifications: () -> Unit,
+    val onOpenTask: (Long) -> Unit,
+    val onComplete: (Long) -> Unit,
+)
+
 @Composable
-fun TaskListScreen(
-    tasks: List<TaskSnapshot>, showArchived: Boolean, onShowArchived: (Boolean) -> Unit,
-    query: String, onQueryChange: (String) -> Unit,
-    notificationsEnabled: Boolean, permissionRequested: Boolean, onEnableNotifications: () -> Unit,
-    saving: Boolean, now: Instant, zone: ZoneId,
-    onOpenTask: (Long) -> Unit, onComplete: (Long) -> Unit,
-) {
-    val today = now.atZone(zone).toLocalDate()
-    val active = tasks.filterNot { it.archived }
-    val visible = visibleTasks(tasks, showArchived, query)
-    var searchExpanded by rememberSaveable { mutableStateOf(query.isNotEmpty()) }
+fun TaskListScreen(content: TaskListContent, actions: TaskListActions) {
+    val today = content.now.atZone(content.zone).toLocalDate()
+    val active = content.tasks.filterNot { it.archived }
+    val visible = visibleTasks(content.tasks, content.showArchived, content.query)
+    var searchExpanded by rememberSaveable { mutableStateOf(content.query.isNotEmpty()) }
     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             Text("今日の完了 ${active.count { task -> task.completions.any { it.localDate == today } }} / ${active.size}", style = MaterialTheme.typography.titleLarge)
         }
-        if (!notificationsEnabled) item {
-            NotificationNotice(permissionRequested, onEnableNotifications)
+        if (!content.notificationsEnabled) item {
+            NotificationNotice(content.permissionRequested, actions.onEnableNotifications)
         }
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                TextButton(onClick = { onShowArchived(!showArchived) }, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text(if (showArchived) "停止中を非表示" else "停止中も表示")
+                TextButton(onClick = { actions.onShowArchived(!content.showArchived) }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(if (content.showArchived) "停止中を非表示" else "停止中も表示")
                 }
                 TextButton(onClick = {
-                    if (searchExpanded) onQueryChange("")
+                    if (searchExpanded) actions.onQueryChange("")
                     searchExpanded = !searchExpanded
                 }, modifier = Modifier.heightIn(min = 48.dp)) {
                     Text(if (searchExpanded) "検索を閉じる" else "検索")
@@ -58,8 +72,8 @@ fun TaskListScreen(
         if (searchExpanded) item {
             Column {
                 OutlinedTextField(
-                    value = query,
-                    onValueChange = onQueryChange,
+                    value = content.query,
+                    onValueChange = actions.onQueryChange,
                     label = { Text("タスクを検索") },
                     singleLine = true,
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Search),
@@ -70,29 +84,29 @@ fun TaskListScreen(
         }
         if (visible.isEmpty()) item {
             Text(when {
-                tasks.isEmpty() -> "まだタスクがありません。＋から、思い出したい行動を追加しましょう。"
-                query.isNotBlank() -> "一致するタスクがありません"
+                content.tasks.isEmpty() -> "まだタスクがありません。＋から、思い出したい行動を追加しましょう。"
+                content.query.isNotBlank() -> "一致するタスクがありません"
                 else -> "実行中のタスクがありません。停止中のタスクはいつでも再開できます。"
             }, style = MaterialTheme.typography.bodyLarge)
         }
         items(visible, key = { it.id }) { task ->
             val largeText = LocalDensity.current.fontScale >= 1.5f
-            val canComplete = taskCanComplete(task, now, zone)
+            val canComplete = taskCanComplete(task, content.now, content.zone)
             val details: @Composable (Modifier) -> Unit = { modifier ->
                 Column(modifier) {
                     Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = if (largeText) 3 else 2, overflow = TextOverflow.Ellipsis)
-                    Text(taskStatus(task, now, zone), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                    Text(taskStatus(task, content.now, content.zone), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
                     Text("完了 ${task.completions.size}回", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
             val completeAction: @Composable () -> Unit = {
                 if (!task.archived) {
-                    TextButton(onClick = { onComplete(task.id) }, enabled = !saving && canComplete) {
+                    TextButton(onClick = { actions.onComplete(task.id) }, enabled = !content.saving && canComplete) {
                         Text(completeActionLabel(task, canComplete))
                     }
                 }
             }
-            Card(onClick = { onOpenTask(task.id) }, modifier = Modifier.fillMaxWidth()) {
+            Card(onClick = { actions.onOpenTask(task.id) }, modifier = Modifier.fillMaxWidth()) {
                 if (largeText) {
                     Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)) {
                         details(Modifier.fillMaxWidth())
@@ -130,6 +144,10 @@ internal fun NotificationNotice(permissionRequested: Boolean, onEnable: () -> Un
 @Composable
 private fun TaskListPreview() {
     TaskNudgeTheme(dynamicColor = false) {
-        Surface { TaskListScreen(emptyList(), false, {}, "", {}, false, false, {}, false, Instant.now(), ZoneId.systemDefault(), {}, {}) }
+        Surface { TaskListScreen(
+            TaskListContent(tasks = emptyList(), showArchived = false, query = "", notificationsEnabled = false,
+                permissionRequested = false, saving = false, now = Instant.now(), zone = ZoneId.systemDefault()),
+            TaskListActions(onShowArchived = {}, onQueryChange = {}, onEnableNotifications = {}, onOpenTask = {}, onComplete = {}),
+        ) }
     }
 }

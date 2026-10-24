@@ -13,17 +13,32 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.tasknudge.core.*
 
+/** Saved settings and the device permissions the settings screen explains. */
+data class SettingsContent(
+    val settings: ReminderSettings,
+    val permissionRequested: Boolean,
+    val notificationsEnabled: Boolean,
+    val exactAlarmAccessGranted: Boolean,
+)
+
+class SettingsActions(
+    val onEnableNotifications: () -> Unit,
+    /** Receives the entered start and end hours as typed, and the selected interval in minutes. */
+    val onSave: (String, String, Int) -> Unit,
+    val onEnableExactAlarm: () -> Unit,
+)
+
 @Composable
-fun SettingsScreen(settings: ReminderSettings, permissionRequested: Boolean, notificationsEnabled: Boolean, state: TaskUiState, onEnable: () -> Unit, onSave: (String, String, Int) -> Unit, exactAlarmAccessGranted: Boolean = true, onEnableExactAlarm: () -> Unit = {}) {
-    var start by rememberSaveable { mutableStateOf(settings.startHour.toString()) }
-    var end by rememberSaveable { mutableStateOf(settings.endHour.toString()) }
-    var interval by rememberSaveable { mutableIntStateOf(settings.intervalMinutes) }
+fun SettingsScreen(content: SettingsContent, state: TaskUiState, actions: SettingsActions) {
+    var start by rememberSaveable { mutableStateOf(content.settings.startHour.toString()) }
+    var end by rememberSaveable { mutableStateOf(content.settings.endHour.toString()) }
+    var interval by rememberSaveable { mutableIntStateOf(content.settings.intervalMinutes) }
     Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (!notificationsEnabled) NotificationNotice(permissionRequested, onEnable)
-        if (!exactAlarmAccessGranted) {
+        if (!content.notificationsEnabled) NotificationNotice(content.permissionRequested, actions.onEnableNotifications)
+        if (!content.exactAlarmAccessGranted) {
             Text("スリープ中の通知", style = MaterialTheme.typography.titleMedium)
             Text("予定時刻に近い通知には、Android の「アラームとリマインダー」の許可が必要です。許可しない場合、通知が遅れることがあります。")
-            TextButton(onClick = onEnableExactAlarm) { Text("アラームとリマインダーを許可") }
+            TextButton(onClick = actions.onEnableExactAlarm) { Text("アラームとリマインダーを許可") }
         }
         Text("通知する時間", style = MaterialTheme.typography.titleLarge)
         OutlinedTextField(start, { start = it }, modifier = Modifier.fillMaxWidth(), label = { Text("開始（時）") }, singleLine = true,
@@ -36,7 +51,7 @@ fun SettingsScreen(settings: ReminderSettings, permissionRequested: Boolean, not
             notificationIntervalOptions.forEach { minutes -> FilterChip(selected = interval == minutes, onClick = { interval = minutes }, label = { Text("${minutes}分") }, modifier = Modifier.heightIn(min = 48.dp)) }
         }
         state.settingsError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("settingsError")) }
-        Button(onClick = { onSave(start, end, interval) }, enabled = state.canSubmit, modifier = Modifier.fillMaxWidth()) { Text(if (state.saving) "保存中…" else if (!state.canSubmit) "保存済み" else "保存") }
+        Button(onClick = { actions.onSave(start, end, interval) }, enabled = state.canSubmit, modifier = Modifier.fillMaxWidth()) { Text(if (state.saving) "保存中…" else if (!state.canSubmit) "保存済み" else "保存") }
         HorizontalDivider()
         Text("通知は端末の状態により遅れることがあります。保留は24時間です。強制停止後は、アプリを開くと通知を再開します。")
         Text("データはこの端末内にのみ保存します。クラウド保存・端末移行・エクスポートには対応していません。アプリを削除すると記録も失われます。", style = MaterialTheme.typography.bodyMedium)
