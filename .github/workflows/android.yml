@@ -27,14 +27,19 @@ jobs:
           packages: platform-tools
       - uses: gradle/actions/setup-gradle@4c125117fe7c5aed11272ec4213f602f012f89f2 # v5
       - run: scripts/check.sh
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      - name: Upload debug APK (best effort)
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
+        continue-on-error: true
         with:
           name: task-nudge-debug
           path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: error
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+          if-no-files-found: warn
+          retention-days: 3
+      - name: Upload host test results (best effort)
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
+        continue-on-error: true
         with:
           name: host-test-results
           path: |
@@ -44,6 +49,7 @@ jobs:
             app/build/reports/tests/
             app/build/reports/lint-results-debug.*
           if-no-files-found: warn
+          retention-days: 3
 
   android-device-tests:
     needs: verify
@@ -70,8 +76,10 @@ jobs:
           arch: x86_64
           disable-animations: true
           script: scripts/device-smoke.sh
-      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+      - name: Upload Android test results (best effort)
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
+        continue-on-error: true
         with:
           name: android-test-results
           path: |
@@ -79,3 +87,4 @@ jobs:
             app/build/reports/androidTests/connected/
             build/device-screenshots/
           if-no-files-found: warn
+          retention-days: 3
