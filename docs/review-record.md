@@ -198,3 +198,13 @@ source `6d4db8f` のPR CI `36963062421`・push CI `36963059186` はともにSUCC
 - ローカルでは JDK 17 と Android SDK 36 のコンテナで `scripts/check.sh` を実行した。core・app の単体テスト計143件が失敗・エラー・スキップなし。lint は既存の警告のみで、debug APK と計装テスト用 APK のビルドも成功。接続端末はなく、端末テストは PR の API35 エミュレーター CI で確認する。
 - 全差分の独立レビューは、Codex CLI が利用上限に達して実行できなかった。代わりに Gemini（Antigravity CLI、`Gemini 3.8 Flash (High)`、plan モード、ツール呼び出しなし）と、GitHub Copilot CLI 1.0.103 の `gpt-6-luna`（推論 high、書き込みとシェルを禁止）で読み取り専用レビューした。モデルは CLI のログとセッション記録で確認した。どちらも重大な指摘はなかった。
 - Gemini の軽微な指摘を受け、保存値が不正なときの画面の復元を、例外にせず一覧に戻すようにした。Copilot の軽微な指摘を受け、画面の操作の型から「何もしない」既定値を外し、配線漏れをコンパイルで検出できるようにした。修正後の `scripts/check.sh` も単体テスト143件が成功。後者の修正はコンパイルで確認できる範囲のため、再レビューはしていない。
+
+## Issue #38 ビルド・テスト用のコンテナ（2026-10-25）
+
+- `Dockerfile` と `scripts/container-check.sh` を追加した。ベースイメージは tag と digest、command-line tools は ZIP の SHA-256、SDK は Platform 36 と Build Tools 35 で固定した。Build Tools 35 は、#35 の使い捨てコンテナで AGP が毎回自動ダウンロードしていたため、イメージに含めた。
+- 最初の実行では Robolectric を使う4クラスが `Couldn't create lock file ?/.robolectric-download-lock` で失敗した。ホストの UID には passwd の項目がなく、Java が `user.home` を `?` にしたことが原因。`JAVA_TOOL_OPTIONS=-Duser.home=/cache/home` で解消し、Robolectric の Android ライブラリもキャッシュのボリュームに残るようにした。
+- clone した直後の作業ツリーで、イメージ・ビルドキャッシュ・ボリュームを消してから `scripts/container-check.sh` を実行し、5分18秒で成功した。core・app の単体テスト計143件が失敗・スキップなし、lint は既存の警告のみ、debug APK と計装テスト用 APK も生成された。ワークツリーにはホストのユーザー以外が所有するファイルも `local.properties` も残らなかった。
+- コンテナで作った debug APK の署名証明書（SHA-256 `b5e7a6af…`）は、ホストで作った APK と端末のアプリ（`451a1cb4…`）と異なることを確認し、普段使いの端末に上書きしないよう `docs/testing.md` に書いた。
+- 全差分を Codex CLI 0.164.0 の `gpt-6.1-sol`（推論 high、`--sandbox read-only`）でレビューした。モデルはセッション記録で確認した。blocking はなく、should-fix が3件。(1) キャッシュのボリュームが誰でも書き込める設定で、別の UID が Gradle の init スクリプトを置けば次の実行で動いてしまう。(2) `platforms;android-36` はリビジョンを固定していない。(3) rootless モードの Docker ではホストのユーザーの所有権を保てない。いずれも採用し、(1) 実行のたびにボリュームをホストのユーザー所有・700 にする、(2) Platform のリビジョン 2 と Build Tools 35.0.0 をイメージの作成時に照合する、(3) rootless を検出して止める、とした。
+- 修正コミットを同じ設定で再レビューした。`install -d` が既存のディレクトリにも所有者と権限を適用することと、リビジョンの照合・rootless の検出が働くことは確認された。一方で、(1) 1777 だった間に置かれたファイルが残る、(2) 別のユーザー ID で既存のキャッシュを使うと中のファイルに書き込めない、(3) `userns-remap` を使う Docker も所有者を保てない、の3件が指摘された。キャッシュのボリュームをユーザー ID ごとに分けて旧ボリュームを再利用しないようにし、`userns-remap` も検出して止めるようにした。1777 の版はマージ前で、旧ボリュームはこの作業環境にしかなかったため削除した。
+- 再指摘への修正後、clone した直後の作業ツリーと新しいボリュームで `scripts/container-check.sh` を再実行し、単体テスト143件が成功、ホストのユーザー以外が所有するファイルと `local.properties` が残らないことを確認した。この修正はボリューム名と検出条件の変更に限られるため、3回目のレビューはしていない。
