@@ -41,4 +41,4 @@ Android 13 以上では、明示的に「通知を有効にする」を押した
 
 ## 開発と検証
 
-JDK 17、Android SDK 36、Gradle 8.13（同梱 wrapper）、AGP 8.13.2、Kotlin 2.2.21 を使います。`scripts/check.sh` は core/app 単体テスト、lint、debug APK と instrumentation APK のビルドを実行します。**専用テスト端末またはエミュレーター**を 1 台接続して `scripts/device-smoke.sh` を実行すると、Compose と実通知の instrumentation テストを実行します。端末テスト後はアプリがアンインストールされるため、普段の記録がある端末では実行しないでください。手順と端末上の確認項目は [docs/testing.md](docs/testing.md)、今回の開発記録は [docs/android-development-notes.md](docs/android-development-notes.md) を参照してください。
+JDK 17、Android SDK 36、Gradle 8.13（同梱 wrapper）、AGP 8.13.2、Kotlin 2.2.21 を使います。`scripts/check.sh` は core/app 単体テスト、lint、debug APK と instrumentation APK のビルドを実行します。ホストに JDK と SDK がない場合は、Docker で `scripts/container-check.sh` を実行すると同じ検証ができます。**専用テスト端末またはエミュレーター**を 1 台接続して `scripts/device-smoke.sh` を実行すると、Compose と実通知の instrumentation テストを実行します。端末テスト後はアプリがアンインストールされるため、普段の記録がある端末では実行しないでください。手順と端末上の確認項目は [docs/testing.md](docs/testing.md)、今回の開発記録は [docs/android-development-notes.md](docs/android-development-notes.md) を参照してください。

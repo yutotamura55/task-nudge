@@ -198,3 +198,10 @@ source `6d4db8f` のPR CI `36963062421`・push CI `36963059186` はともにSUCC
 - ローカルでは JDK 17 と Android SDK 36 のコンテナで `scripts/check.sh` を実行した。core・app の単体テスト計143件が失敗・エラー・スキップなし。lint は既存の警告のみで、debug APK と計装テスト用 APK のビルドも成功。接続端末はなく、端末テストは PR の API35 エミュレーター CI で確認する。
 - 全差分の独立レビューは、Codex CLI が利用上限に達して実行できなかった。代わりに Gemini（Antigravity CLI、`Gemini 3.8 Flash (High)`、plan モード、ツール呼び出しなし）と、GitHub Copilot CLI 1.0.103 の `gpt-6-luna`（推論 high、書き込みとシェルを禁止）で読み取り専用レビューした。モデルは CLI のログとセッション記録で確認した。どちらも重大な指摘はなかった。
 - Gemini の軽微な指摘を受け、保存値が不正なときの画面の復元を、例外にせず一覧に戻すようにした。Copilot の軽微な指摘を受け、画面の操作の型から「何もしない」既定値を外し、配線漏れをコンパイルで検出できるようにした。修正後の `scripts/check.sh` も単体テスト143件が成功。後者の修正はコンパイルで確認できる範囲のため、再レビューはしていない。
+
+## Issue #38 ビルド・テスト用のコンテナ（2026-10-25）
+
+- `Dockerfile` と `scripts/container-check.sh` を追加した。ベースイメージは tag と digest、command-line tools は ZIP の SHA-256、SDK は Platform 36 と Build Tools 35 で固定した。Build Tools 35 は、#35 の使い捨てコンテナで AGP が毎回自動ダウンロードしていたため、イメージに含めた。
+- 最初の実行では Robolectric を使う4クラスが `Couldn't create lock file ?/.robolectric-download-lock` で失敗した。ホストの UID には passwd の項目がなく、Java が `user.home` を `?` にしたことが原因。`JAVA_TOOL_OPTIONS=-Duser.home=/cache/home` で解消し、Robolectric の Android ライブラリもキャッシュのボリュームに残るようにした。
+- clone した直後の作業ツリーで、イメージ・ビルドキャッシュ・ボリュームを消してから `scripts/container-check.sh` を実行し、5分18秒で成功した。core・app の単体テスト計143件が失敗・スキップなし、lint は既存の警告のみ、debug APK と計装テスト用 APK も生成された。ワークツリーにはホストのユーザー以外が所有するファイルも `local.properties` も残らなかった。
+- コンテナで作った debug APK の署名証明書（SHA-256 `b5e7a6af…`）は、ホストで作った APK と端末のアプリ（`451a1cb4…`）と異なることを確認し、普段使いの端末に上書きしないよう `docs/testing.md` に書いた。

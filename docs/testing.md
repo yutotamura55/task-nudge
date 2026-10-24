@@ -1,5 +1,32 @@
 # 検証ガイド
 
+## コンテナでビルド・テストする
+
+JDK と Android SDK をホストに入れずに、`scripts/check.sh` と同じ検証を Docker コンテナで実行できます。
+必要なのは Docker だけです。
+
+```bash
+scripts/container-check.sh
+```
+
+- リポジトリ直下の `Dockerfile` からイメージ `task-nudge-build:local` を作り、その中で `scripts/check.sh` を実行します。
+  JDK 17、Android SDK Platform 36、Build Tools 35 の版はこの `Dockerfile` で固定しています。
+- 引数を付けると、`scripts/check.sh` の代わりにそのコマンドを実行します。
+  例：`scripts/container-check.sh ./gradlew --no-daemon :core:test`
+- ホストのユーザーとして実行するので、`build/` などの生成物はホストのユーザーの所有になります。
+  `local.properties` は作りません。
+- Gradle のキャッシュと Robolectric がダウンロードする Android のライブラリは、Docker ボリューム `task-nudge-build-cache` に保存します。
+  初回はダウンロードを含めて5分ほどかかります。
+  キャッシュを消すときは `docker volume rm task-nudge-build-cache` を実行します。次の実行で作り直されます。
+- **コンテナで作った APK を普段使いの端末に上書きしないでください。**
+  debug 署名の鍵はキャッシュのボリューム内で作られ、ホストの `~/.android/debug.keystore` とは別の鍵です。
+  署名が違う APK は上書きできず、アンインストールすると記録が消えます。
+  普段使いの端末に入れる APK はホストでビルドし、下の「手動で APK を入れる場合」の手順で署名を確かめます。
+
+エミュレーターと実機での計装テスト（`scripts/device-smoke.sh`）、`adb` での接続とインストールはコンテナの外で行います。
+USB 端末や KVM をコンテナに渡す構成にしていないためです。
+ホストには、下の「ホスト環境」の JDK と SDK、および platform-tools が必要です。
+
 ## ホスト環境
 
 - JDK 17、Android SDK Platform 36、Android SDK Build Tools 35、platform-tools。Gradle 8.13 は `gradlew` に固定されています。
