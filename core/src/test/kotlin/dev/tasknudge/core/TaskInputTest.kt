@@ -34,7 +34,7 @@ class TaskInputTest {
 
     @Test fun settingsAcceptValidHoursAndSupportedCadences() {
         assertEquals(ReminderSettings(), validateSettings(ReminderSettings()))
-        for (minutes in listOf(15, 30, 60, 120)) {
+        for (minutes in listOf(5, 10, 15, 30, 60, 120)) {
             val settings = ReminderSettings(0, 24, minutes)
             assertEquals(settings, validateSettings(settings))
         }
@@ -53,7 +53,7 @@ class TaskInputTest {
     }
 
     @Test fun settingsRejectUnsupportedCadence() {
-        for (minutes in listOf(-1, 0, 14, 16, 31, 90, 121, Int.MAX_VALUE)) {
+        for (minutes in listOf(-1, 0, 4, 6, 9, 11, 14, 16, 31, 90, 121, Int.MAX_VALUE)) {
             assertThrows(IllegalArgumentException::class.java) { validateSettings(ReminderSettings(intervalMinutes = minutes)) }
         }
     }

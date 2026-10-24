@@ -195,10 +195,19 @@ class TaskViewModelTest {
             vm.saveSettings(start, end, interval); runCurrent()
             assertNotNull(vm.state.value.settingsError)
         }
+        assertTrue(vm.state.value.settingsError!!.endsWith("間隔は5・10・15・30・60・120分です。"))
         assertTrue(repo.settings.isEmpty())
         vm.saveSettings("0", "24", 120); runCurrent()
         assertEquals(ReminderSettings(0, 24, 120), repo.settings.single())
         assertTrue(vm.settingsSaved)
+    }
+    @Test fun settingsAcceptFiveAndTenMinuteIntervals() = runTest(dispatcher) {
+        for (minutes in listOf(5, 10)) {
+            val repo = FakeRepository(); val vm = TaskViewModel(repo)
+            vm.saveSettings("9", "21", minutes); runCurrent()
+            assertNull(vm.state.value.settingsError)
+            assertEquals(ReminderSettings(9, 21, minutes), repo.settings.single())
+        }
     }
     @Test fun readRetryRecoversCommittedTaskAndKeepsOneSubscription() = runTest(dispatcher) {
         val repo = FakeRepository().apply { publishSaves = false }
