@@ -13,7 +13,7 @@ Android 8.0（API 26）以上の**専用テスト端末またはエミュレー�
 
 手動で APK を入れる場合、既存アプリと同じ署名なら `adb install -r app/build/outputs/apk/debug/app-debug.apk` で上書きできます。CI の debug 署名は実行間で固定管理されず、別 run の APK は上書きできる保証がありません。署名が違ってアンインストールすると記録は消えます。テスト APK は `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk` です。個別の原因調査では、両 APK を入れた後に `adb shell am instrument -w dev.tasknudge.test/dev.tasknudge.DeviceTestRunner` を実行できます。`adb logcat` で `ReminderEngine` と `TaskNudge` の記録を確認します。テストは専用のインメモリ Room DB を使い、テスト中の実通知を最後に消します。
 
-GitHub Actions は pull request と feature/main branch push でホスト検証を実行し、続けて API 35 Google APIs x86_64 エミュレーターで端末テストを走らせます。成功した run の `task-nudge-debug` に APK、`host-test-results` に JVM/lint、`android-test-results` に instrumentation 結果と実画面画像があります。失敗時も利用できる結果を artifact に残します。ローカルで `/dev/kvm` が使えない場合は、CI の emulator job の成功を確認するまで端末検証を完了と扱いません。
+GitHub Actions は pull request と main への push で起動し、ホスト検証と API 35 Google APIs x86_64 エミュレーターの端末テストを別 runner で並行実行します。PR 作成前の検証にはローカルの `scripts/check.sh` を使います。アップロードに成功した run では、`task-nudge-debug` に APK、`host-test-results` に JVM/lint、`android-test-results` に instrumentation 結果と実画面画像が3日間保存されます。アップロード失敗はジョブを失敗にしないため、必要な成果物は run の **Artifacts** 一覧で存在を確認してください。ローカルで `/dev/kvm` が使えない場合は、CI の emulator job の成功を確認するまで端末検証を完了と扱いません。
 
 README の3画像は [成功したCI 36952478562](https://github.com/yutotamura55/task-nudge/actions/runs/36952478562) のAPI35実画面です。最終source `6d4db8f` の [PR CI 36963062421](https://github.com/yutotamura55/task-nudge/actions/runs/36963062421) と [push CI 36963059186](https://github.com/yutotamura55/task-nudge/actions/runs/36963059186) は単体101件・端末24件がすべて成功。両runの画像も掲載画像とSHA-256一致を確認しました。現在のchecksは [PR #2](https://github.com/yutotamura55/task-nudge/pull/2) を参照してください。
 
