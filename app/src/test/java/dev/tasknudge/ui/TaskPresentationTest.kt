@@ -34,5 +34,17 @@ class TaskPresentationTest {
         assertEquals(NotificationEnableAction.SETTINGS, notificationEnableAction(33, true, false))
         assertEquals(NotificationEnableAction.SETTINGS, notificationEnableAction(32, false, false))
     }
+    @Test fun titleSearchUsesPartialCaseInsensitiveMatchesAndIgnoresOuterWhitespace() {
+        val tasks = listOf(task.copy(id = 1, title = "Morning Stretch"), task.copy(id = 2, title = "肩のストレッチ"), task.copy(id = 3, title = "読書"))
+        assertEquals(listOf(1L), visibleTasks(tasks, false, "  STRETCH  ").map { it.id })
+        assertEquals(listOf(2L), visibleTasks(tasks, false, "ストレッチ").map { it.id })
+        assertEquals(tasks, visibleTasks(tasks, false, "  "))
+    }
+    @Test fun titleSearchRespectsArchivedVisibility() {
+        val stopped = task.copy(id = 2, title = "肩のストレッチ", archived = true)
+        val tasks = listOf(task.copy(title = "首のストレッチ"), stopped)
+        assertEquals(listOf(1L), visibleTasks(tasks, false, "ストレッチ").map { it.id })
+        assertEquals(listOf(1L, 2L), visibleTasks(tasks, true, "ストレッチ").map { it.id })
+    }
     private fun record(day: String) = CompletionRecord(1, Instant.EPOCH, LocalDate.parse(day))
 }

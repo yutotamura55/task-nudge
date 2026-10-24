@@ -59,6 +59,7 @@ fun TaskNudgeApp(
         screen = destination
     }
     var showArchived by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     var now by remember(clock) { mutableStateOf(clock.instant()) }
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner, clock) {
@@ -149,7 +150,7 @@ fun TaskNudgeApp(
                             val taskId = task.id
                             TaskDetailScreen(task, !state.canSubmit, now, zone, { navigateFrom(owner, "editor", taskId) }, { vm.completeTask(taskId, owner) }, { vm.setArchived(taskId, it, owner) })
                         }
-                        else -> TaskListScreen(snapshot.tasks, showArchived, { if (sessionId == owner) showArchived = it }, notificationsEnabled, snapshot.permissionRequested, { if (sessionId == owner) onEnableNotifications() }, !state.canSubmit, now, zone, { navigateFrom(owner, "detail", it) }, { vm.completeTask(it, owner) })
+                        else -> TaskListScreen(snapshot.tasks, showArchived, { if (sessionId == owner) showArchived = it }, searchQuery, { if (sessionId == owner) searchQuery = it }, notificationsEnabled, snapshot.permissionRequested, { if (sessionId == owner) onEnableNotifications() }, !state.canSubmit, now, zone, { navigateFrom(owner, "detail", it) }, { vm.completeTask(it, owner) })
                     }
                 }
             }
