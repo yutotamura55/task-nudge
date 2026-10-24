@@ -517,12 +517,12 @@ class TaskScreensTest {
         assertEquals("24", compose.onNodeWithText("終了（時）").fetchSemanticsNode().config[SemanticsProperties.EditableText].text)
         dismissKeyboard()
         compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().assertIsEnabled().performClick()
-        val message = "開始は0〜23時、終了は1〜24時の整数で、開始より後に設定してください。間隔は15・30・60・120分です。"
+        val message = "開始は0〜23時、終了は1〜24時の整数で、開始より後に設定してください。間隔は5・10・15・30・60・120分です。"
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("settingsError", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(message, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         assertEquals(ReminderSettings(), repo.data.value.settings)
         compose.onNodeWithText("開始（時）").performTextReplacement("0")
-        compose.onNodeWithText("120分").performClick()
+        compose.onNodeWithText("120分").performScrollTo().performClick()
         tapSave()
         compose.waitUntil { repo.data.value.settings == ReminderSettings(0, 24, 120) }
     }

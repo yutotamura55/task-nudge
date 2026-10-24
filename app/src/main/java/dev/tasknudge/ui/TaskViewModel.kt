@@ -3,6 +3,7 @@ package dev.tasknudge.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.tasknudge.core.ReminderSettings
+import dev.tasknudge.core.notificationIntervalOptions
 import dev.tasknudge.core.validateSettings
 import dev.tasknudge.core.validateTaskInput
 import dev.tasknudge.core.validateBulkTaskInput
@@ -100,7 +101,7 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
         val endHour = end.toIntOrNull()
         val settings = if (startHour != null && endHour != null) ReminderSettings(startHour, endHour, interval) else null
         val valid = settings != null && runCatching { validateSettings(settings) }.isSuccess
-        mutableState.update { it.copy(settingsError = if (valid) null else "開始は0〜23時、終了は1〜24時の整数で、開始より後に設定してください。間隔は15・30・60・120分です。") }
+        mutableState.update { it.copy(settingsError = if (valid) null else "開始は0〜23時、終了は1〜24時の整数で、開始より後に設定してください。間隔は${notificationIntervalOptions.joinToString("・")}分です。") }
         if (!valid) return
         mutate(sessionId) { repository.saveSettings(settings!!); OperationResult.SettingsSaved }
     }
