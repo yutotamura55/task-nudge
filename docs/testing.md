@@ -4,7 +4,7 @@
 
 JDK と Android SDK をホストに入れずに、`scripts/check.sh` と同じ検証を Docker コンテナで実行できます。
 必要なのは Docker だけです。
-rootless モードの Docker では生成物の所有者を保てないため、スクリプトは実行前に止まります。
+rootless モードや `userns-remap` を使う Docker では生成物の所有者を保てないため、スクリプトは実行前に止まります。
 
 ```bash
 scripts/container-check.sh
@@ -17,9 +17,9 @@ scripts/container-check.sh
   例：`scripts/container-check.sh ./gradlew --no-daemon :core:test`
 - ホストのユーザーとして実行するので、`build/` などの生成物はホストのユーザーの所有になります。
   `local.properties` は作りません。
-- Gradle のキャッシュと Robolectric がダウンロードする Android のライブラリは、Docker ボリューム `task-nudge-build-cache` に保存します。
+- Gradle のキャッシュと Robolectric がダウンロードする Android のライブラリは、Docker ボリューム `task-nudge-build-cache-<ユーザー ID>`（例：`task-nudge-build-cache-1000`）に保存します。ユーザー ID は `id -u` で分かります。
   初回はダウンロードを含めて5分ほどかかります。
-  キャッシュを消すときは `docker volume rm task-nudge-build-cache` を実行します。次の実行で作り直されます。
+  キャッシュを消すときは `docker volume rm task-nudge-build-cache-$(id -u)` を実行します。次の実行で作り直されます。
   キャッシュには実行時に読み込まれる Gradle のプラグインなどが入るため、スクリプトは毎回このボリュームをホストのユーザーだけが書き込める状態にしてから実行します。
 - **コンテナで作った APK を普段使いの端末に上書きしないでください。**
   debug 署名の鍵はキャッシュのボリューム内で作られ、ホストの `~/.android/debug.keystore` とは別の鍵です。

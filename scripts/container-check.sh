@@ -5,12 +5,11 @@ set -euo pipefail
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 image="task-nudge-build:local"
-cache_volume="task-nudge-build-cache"
 
-# Rootless Docker maps the host user to container UID 0, so --user would not keep
-# generated files owned by the host user.
-if docker info --format '{{.SecurityOptions}}' | grep -q rootless; then
-  echo "rootless Docker is not supported; use the system Docker daemon." >&2
+# Rootless Docker and userns-remap translate container UIDs, so --user would not
+# keep generated files owned by the host user.
+if docker info --format '{{.SecurityOptions}}' | grep -Eq 'rootless|userns'; then
+  echo "Docker with rootless mode or userns-remap is not supported; use a daemon without UID remapping." >&2
   exit 1
 fi
 
@@ -19,6 +18,8 @@ docker build --quiet --tag "$image" - < "$repo_root/Dockerfile" >/dev/null
 
 uid="$(id -u)"
 gid="$(id -g)"
+# One cache per host user: files left by another UID are never reused.
+cache_volume="task-nudge-build-cache-$uid"
 # The cache holds Gradle init scripts and plugins that run as the host user, so
 # only that user may write to it.
 docker run --rm --user 0 --volume "$cache_volume:/cache" "$image" \
