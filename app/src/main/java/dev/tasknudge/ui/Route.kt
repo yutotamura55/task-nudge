@@ -45,9 +45,10 @@ sealed interface Route {
                 }
             },
             restore = { saved ->
-                when (saved[0]) {
-                    "detail" -> Detail(saved[1] as Long)
-                    "editor" -> Editor(saved.getOrNull(1) as Long?)
+                val taskId = saved.getOrNull(1) as? Long
+                when (saved.firstOrNull()) {
+                    "detail" -> taskId?.let(::Detail) ?: TaskList
+                    "editor" -> Editor(taskId)
                     "bulk" -> Bulk
                     "settings" -> Settings
                     else -> TaskList
