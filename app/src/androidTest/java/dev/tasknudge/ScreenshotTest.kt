@@ -139,6 +139,28 @@ class ScreenshotTest {
         }
     }
 
+    @Test fun fiveAndTenMinuteIntervalsPersistAndRemainSelectedAfterReopening() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            waitForAddFabVisible()
+            for (minutes in listOf(5, 10)) {
+                compose.onNodeWithContentDescription("通知設定").performClick()
+                compose.onNodeWithText("${minutes}分").performScrollTo().assertIsDisplayed().performClick()
+                compose.onNodeWithText("${minutes}分").assertIsSelected()
+                compose.onNodeWithText("保存").performScrollTo().performClick()
+                compose.waitUntil(10_000) {
+                    runBlocking { app.container.repository.snapshots.first().settings.intervalMinutes == minutes }
+                }
+                waitForAddFabVisible()
+                compose.onNodeWithContentDescription("通知設定").performClick()
+                compose.onNodeWithText("${minutes}分").performScrollTo().assertIsSelected()
+                scenario.recreate()
+                compose.onNodeWithText("${minutes}分").performScrollTo().assertIsDisplayed().assertIsSelected()
+                compose.onNodeWithContentDescription("戻る").performClick()
+                waitForAddFabVisible()
+            }
+        }
+    }
+
     @Test fun notificationTapRoutesToDetailOnColdAndExistingActivity() = runBlocking {
         if (Build.VERSION.SDK_INT >= 33) instrumentation.uiAutomation.grantRuntimePermission(app.packageName, Manifest.permission.POST_NOTIFICATIONS)
         app.container.repository.saveSettings(ReminderSettings(0, 24, 30))
