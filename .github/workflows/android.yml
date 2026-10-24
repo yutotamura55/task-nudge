@@ -33,7 +33,6 @@ jobs:
         continue-on-error: true
         with:
           name: task-nudge-debug
-          retention-days: 7
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: warn
           retention-days: 3
@@ -43,7 +42,6 @@ jobs:
         continue-on-error: true
         with:
           name: host-test-results
-          retention-days: 7
           path: |
             core/build/test-results/
             core/build/reports/tests/
@@ -83,7 +81,6 @@ jobs:
         continue-on-error: true
         with:
           name: android-test-results
-          retention-days: 7
           path: |
             app/build/outputs/androidTest-results/connected/
             app/build/reports/androidTests/connected/
