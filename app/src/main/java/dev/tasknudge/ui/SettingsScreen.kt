@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import dev.tasknudge.core.ReminderSettings
+import dev.tasknudge.core.notificationIntervalOptions
 
 @Composable
 fun SettingsScreen(settings: ReminderSettings, permissionRequested: Boolean, notificationsEnabled: Boolean, state: TaskUiState, onEnable: () -> Unit, onSave: (String, String, Int) -> Unit, exactAlarmAccessGranted: Boolean = true, onEnableExactAlarm: () -> Unit = {}) {
@@ -33,7 +34,7 @@ fun SettingsScreen(settings: ReminderSettings, permissionRequested: Boolean, not
         Text("通知の間隔", style = MaterialTheme.typography.titleMedium)
         // Wrap chips on narrow screens or when fonts are enlarged.
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            listOf(15, 30, 60, 120).forEach { minutes -> FilterChip(selected = interval == minutes, onClick = { interval = minutes }, label = { Text("${minutes}分") }, modifier = Modifier.heightIn(min = 48.dp)) }
+            notificationIntervalOptions.forEach { minutes -> FilterChip(selected = interval == minutes, onClick = { interval = minutes }, label = { Text("${minutes}分") }, modifier = Modifier.heightIn(min = 48.dp)) }
         }
         state.settingsError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("settingsError")) }
         Button(onClick = { onSave(start, end, interval) }, enabled = state.canSubmit, modifier = Modifier.fillMaxWidth()) { Text(if (state.saving) "保存中…" else if (!state.canSubmit) "保存済み" else "保存") }

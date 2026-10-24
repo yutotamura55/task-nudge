@@ -80,6 +80,14 @@ class ReminderEngineTest {
         engine.evaluate()
         assertEquals(Instant.parse("2026-10-02T00:00:00Z"), scheduler.nextAlarm)
     }
+    @Test fun shortIntervalsScheduleTheNextNotificationOpportunity() = runTest {
+        repo.saveTask(null, "首")
+        for (minutes in listOf(5, 10)) {
+            repo.saveSettings(ReminderSettings(0, 24, minutes))
+            engine.evaluate()
+            assertEquals(clock.instant().plus(Duration.ofMinutes(minutes.toLong())), scheduler.nextAlarm)
+        }
+    }
     @Test fun oneDelayedEvaluationDoesNotBackfillMissedIntervals() = runTest {
         repo.saveSettings(ReminderSettings(0, 24, 15))
         repo.saveTask(null, "首")
