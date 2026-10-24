@@ -72,8 +72,11 @@ class TaskScreensTest {
         var requests = 0
         compose.setContent {
             TaskNudgeTheme(dynamicColor = false) {
-                SettingsScreen(ReminderSettings(9, 21, 30), false, true, TaskUiState(), {}, { _, _, _ -> },
-                    exactAlarmAccessGranted = false, onEnableExactAlarm = { requests++ })
+                SettingsScreen(
+                    SettingsContent(ReminderSettings(9, 21, 30), permissionRequested = false, notificationsEnabled = true, exactAlarmAccessGranted = false),
+                    TaskUiState(),
+                    SettingsActions(onEnableExactAlarm = { requests++ }),
+                )
             }
         }
         compose.onNodeWithText("アラームとリマインダーを許可").performClick()
@@ -90,9 +93,7 @@ class TaskScreensTest {
         compose.setContent {
             TaskNudgeTheme(dynamicColor = false) {
                 Box(Modifier.size(360.dp, 560.dp)) {
-                    TaskListScreen(tasks, false, {}, "", {}, true, false, {}, false,
-                        Instant.parse("2026-10-01T10:00:00Z"), ZoneId.of("Asia/Tokyo"),
-                        { openedTask = it }, {})
+                    TaskListScreen(listContent(tasks), TaskListActions(onOpenTask = { openedTask = it }))
                 }
             }
         }
@@ -134,8 +135,7 @@ class TaskScreensTest {
             TaskNudgeTheme(dynamicColor = false) {
                 CompositionLocalProvider(LocalDensity provides Density(1f, 2f)) {
                     Box(Modifier.size(360.dp, 560.dp)) {
-                        TaskListScreen(listOf(sampleTask().copy(title = title)), false, {}, "", {}, true, false, {}, false,
-                            Instant.parse("2026-10-01T10:00:00Z"), ZoneId.of("Asia/Tokyo"), {}, {})
+                        TaskListScreen(listContent(listOf(sampleTask().copy(title = title))), TaskListActions())
                     }
                 }
             }
@@ -612,6 +612,10 @@ class TaskScreensTest {
     }
 }
 
+private fun listContent(tasks: List<TaskSnapshot>) = TaskListContent(
+    tasks = tasks, showArchived = false, query = "", notificationsEnabled = true, permissionRequested = false,
+    saving = false, now = Instant.parse("2026-10-01T10:00:00Z"), zone = ZoneId.of("Asia/Tokyo"),
+)
 private fun sampleTask() = TaskSnapshot(1, "首", 1, false, Instant.EPOCH, null, listOf(CompletionRecord(1, Instant.parse("2026-09-30T10:00:00Z"), LocalDate.of(2026, 9, 30))))
 private class ScreenRepository(tasks: List<TaskSnapshot> = emptyList(), private val publishSaves: Boolean = true) : TaskRepository {
     var pendingTask: TaskSnapshot? = null
