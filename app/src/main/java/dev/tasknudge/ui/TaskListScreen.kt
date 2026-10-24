@@ -5,10 +5,18 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.tooling.preview.Preview
 import dev.tasknudge.data.TaskSnapshot
@@ -41,15 +49,23 @@ fun taskCanComplete(task: TaskSnapshot, now: Instant, zone: ZoneId): Boolean {
     else task.completions.none { it.localDate == now.atZone(zone).toLocalDate() }
 }
 
+fun visibleTasks(tasks: List<TaskSnapshot>, showArchived: Boolean, query: String): List<TaskSnapshot> {
+    val keyword = query.trim()
+    return tasks.filter { (showArchived || !it.archived) && it.title.contains(keyword, ignoreCase = true) }
+}
+
 @Composable
 fun TaskListScreen(
     tasks: List<TaskSnapshot>, showArchived: Boolean, onShowArchived: (Boolean) -> Unit,
+    query: String, onQueryChange: (String) -> Unit,
     notificationsEnabled: Boolean, permissionRequested: Boolean, onEnableNotifications: () -> Unit,
     saving: Boolean, now: Instant, zone: ZoneId,
     onOpenTask: (Long) -> Unit, onComplete: (Long) -> Unit,
 ) {
     val today = now.atZone(zone).toLocalDate()
     val active = tasks.filterNot { it.archived }
+    val visible = visibleTasks(tasks, showArchived, query)
+    var searchExpanded by rememberSaveable { mutableStateOf(query.isNotEmpty()) }
     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             Text("今日の完了 ${active.count { task -> task.completions.any { it.localDate == today } }} / ${active.size}", style = MaterialTheme.typography.titleLarge)
@@ -62,11 +78,33 @@ fun TaskListScreen(
                 TextButton(onClick = { onShowArchived(!showArchived) }, modifier = Modifier.heightIn(min = 48.dp)) {
                     Text(if (showArchived) "停止中を非表示" else "停止中も表示")
                 }
+                TextButton(onClick = {
+                    if (searchExpanded) onQueryChange("")
+                    searchExpanded = !searchExpanded
+                }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text(if (searchExpanded) "検索を閉じる" else "検索")
+                }
             }
         }
-        val visible = tasks.filter { showArchived || !it.archived }
+        if (searchExpanded) item {
+            Column {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    label = { Text("タスクを検索") },
+                    singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Search),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Text("検索結果 ${visible.size}件", modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+            }
+        }
         if (visible.isEmpty()) item {
-            Text(if (tasks.isEmpty()) "まだタスクがありません。＋から、思い出したい行動を追加しましょう。" else "実行中のタスクがありません。停止中のタスクはいつでも再開できます。", style = MaterialTheme.typography.bodyLarge)
+            Text(when {
+                tasks.isEmpty() -> "まだタスクがありません。＋から、思い出したい行動を追加しましょう。"
+                query.isNotBlank() -> "一致するタスクがありません"
+                else -> "実行中のタスクがありません。停止中のタスクはいつでも再開できます。"
+            }, style = MaterialTheme.typography.bodyLarge)
         }
         items(visible, key = { it.id }) { task ->
             val largeText = LocalDensity.current.fontScale >= 1.5f
@@ -123,6 +161,6 @@ internal fun NotificationNotice(permissionRequested: Boolean, onEnable: () -> Un
 @Composable
 private fun TaskListPreview() {
     TaskNudgeTheme(dynamicColor = false) {
-        Surface { TaskListScreen(emptyList(), false, {}, false, false, {}, false, Instant.now(), ZoneId.systemDefault(), {}, {}) }
+        Surface { TaskListScreen(emptyList(), false, {}, "", {}, false, false, {}, false, Instant.now(), ZoneId.systemDefault(), {}, {}) }
     }
 }
