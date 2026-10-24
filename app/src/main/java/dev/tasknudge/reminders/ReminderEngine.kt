@@ -30,14 +30,18 @@ class ReminderEngine(
         }
         override suspend fun saveTask(id: Long?, title: String, recurrenceDays: Int, recurrenceHours: Int?): Long {
             val input = validateTaskInput(title, recurrenceDays)
-            require(recurrenceHours == null || recurrenceHours in 1..24) { "Recurrence must be 1 to 24 hours" }
+            require(recurrenceHours == null || recurrenceError(recurrenceHours, hourly = true) == null) { "Recurrence must be $hourlyRecurrenceRange hours" }
             return mutate(id) {
                 if (id == null) dao.insertTask(TaskEntity(title = input.title, recurrenceDays = input.recurrenceDays, recurrenceHours = recurrenceHours, createdAt = clock.millis()))
-                else { val task = requireNotNull(dao.task(id)) { "Unknown task" }; dao.updateTask(task.copy(title = input.title, recurrenceDays = input.recurrenceDays, recurrenceHours = recurrenceHours)); id }
+                else {
+                    val task = requireNotNull(dao.task(id)) { "Unknown task" }
+                    dao.updateTask(task.copy(title = input.title, recurrenceDays = input.recurrenceDays, recurrenceHours = recurrenceHours))
+                    id
+                }
             }
         }
         override suspend fun saveTasks(inputs: List<TaskInput>): List<Long> {
-            require(inputs.size in 1..100) { "Bulk input must contain 1 to 100 tasks" }
+            require(inputs.isNotEmpty() && inputs.size <= maxBulkTasks) { "Bulk input must contain 1 to $maxBulkTasks tasks" }
             val validated = inputs.map { validateTaskInput(it.title, it.recurrenceDays) }
             return mutate(null) {
                 val createdAt = clock.millis()
@@ -48,7 +52,12 @@ class ReminderEngine(
         }
         override suspend fun setArchived(id: Long, archived: Boolean) { mutate(id) { dao.task(id)?.let { dao.updateTask(it.copy(archived = archived)) } } }
         override suspend fun completeTask(id: Long) { mutate(id) { complete(id) } }
-        override suspend fun saveSettings(settings: ReminderSettings) { validateSettings(settings); mutate(null) { dao.saveSettings(dao.settings().copy(startHour = settings.startHour, endHour = settings.endHour, intervalMinutes = settings.intervalMinutes)) } }
+        override suspend fun saveSettings(settings: ReminderSettings) {
+            validateSettings(settings)
+            mutate(null) {
+                dao.saveSettings(dao.settings().copy(startHour = settings.startHour, endHour = settings.endHour, intervalMinutes = settings.intervalMinutes))
+            }
+        }
         override suspend fun recordPermissionRequest() { mutate(null) { dao.saveSettings(dao.settings().copy(permissionRequested = true)) } }
     }
 
@@ -79,36 +88,37 @@ class ReminderEngine(
     private suspend fun complete(id: Long) {
         val task = dao.task(id) ?: return
         val now = clock.instant()
-        val today = now.atZone(zoneProvider()).toLocalDate().toString()
-        val completions = dao.taskWithCompletions(id)?.completions.orEmpty()
-        if (task.recurrenceHours == null) {
-            if (completions.any { it.localDate == today }) return
-        } else {
-            val last = completions.maxOfOrNull { it.completedAt }
-            if (last != null && now.isBefore(Instant.ofEpochMilli(last).plus(Duration.ofHours(task.recurrenceHours.toLong())))) return
-        }
-        dao.insertCompletion(CompletionEntity(taskId = id, completedAt = now.toEpochMilli(), localDate = today))
+        val today = now.atZone(zoneProvider()).toLocalDate()
+        if (dao.taskWithCompletions(id)?.reminderTask(today)?.canComplete(now) != true) return
+        dao.insertCompletion(CompletionEntity(taskId = id, completedAt = now.toEpochMilli(), localDate = today.toString()))
         dao.updateTask(task.copy(snoozedUntil = null))
     }
 
     suspend fun evaluate() = mutex.withLock {
-        var nextSettings: ReminderSettings? = null
+        var settings: ReminderSettings? = null
         try {
-        reconcileLocked()
+            reconcileLocked()
+            settings = dao.settings().core()
+            postNextReminderLocked(settings)
+        } finally {
+            scheduleNextEvaluationLocked(settings)
+        }
+    }
+
+    private suspend fun postNextReminderLocked(settings: ReminderSettings) {
         val now = clock.instant()
         val zone = zoneProvider()
-        val settings = dao.settings().core()
-        nextSettings = settings
-        if (!gateway.canNotify()) return@withLock
+        if (!gateway.canNotify()) return
         val reminders = dao.activeReminders()
         val lastByTask = reminders.filter { it.deliveredAt != null }
             .groupBy { it.taskId }
             .mapValues { (_, values) -> Instant.ofEpochMilli(values.maxOf { requireNotNull(it.deliveredAt) }) }
         val tasks = dao.tasks()
+        val today = now.atZone(zone).toLocalDate()
         val id = ReminderPolicy.select(
-            tasks.map { it.policy(now.atZone(zone).toLocalDate()) }, now, zone, settings,
+            tasks.map { it.reminderTask(today) }, now, zone, settings,
             dao.state().lastNotifiedAt?.let(Instant::ofEpochMilli), lastByTask,
-        ) ?: return@withLock
+        ) ?: return
         val task = tasks.first { it.task.id == id }.task
         // Leave room below the platform's active-notification limit.
         if (reminders.size >= maxVisibleReminders) {
@@ -116,11 +126,11 @@ class ReminderEngine(
             database.withTransaction { dao.deleteActiveReminder(oldest.notificationId) }
             cancelMatching(listOf(oldest))
         }
+        // Reserve the row before posting so a restart can tell which OS notification is ours.
         val token = UUID.randomUUID().toString()
         val notificationId = database.withTransaction {
             dao.insertActiveReminder(ActiveReminderEntity(
-                taskId = id, token = token, localDate = now.atZone(zone).toLocalDate().toString(),
-                preparedAt = now.toEpochMilli(),
+                taskId = id, token = token, localDate = today.toString(), preparedAt = now.toEpochMilli(),
             )).toInt()
         }
         try {
@@ -129,19 +139,20 @@ class ReminderEngine(
             if (failure is CancellationException) throw failure
             database.withTransaction { dao.deleteActiveReminder(notificationId) }
             if (gateway.activeTokens()[notificationId] == token) gateway.cancel(notificationId)
-            return@withLock
+            return
         }
         database.withTransaction {
             dao.markDelivered(notificationId, now.toEpochMilli())
             dao.saveState(dao.state().copy(lastNotifiedAt = now.toEpochMilli()))
         }
-        } finally {
-            val alarmNow = clock.instant()
-            val alarmSettings = nextSettings
-            val next = if (alarmSettings == null) alarmNow.plus(Duration.ofMinutes(15))
-                else nextEvaluationAt(alarmNow, zoneProvider(), alarmSettings, dao.state().lastNotifiedAt)
-            scheduler.scheduleWhileIdle(next)
-        }
+    }
+
+    /** Without readable settings, retry after the periodic-work interval. */
+    private suspend fun scheduleNextEvaluationLocked(settings: ReminderSettings?) {
+        val now = clock.instant()
+        val next = if (settings == null) now.plus(Duration.ofMinutes(15))
+            else nextEvaluationAt(now, zoneProvider(), settings, dao.state().lastNotifiedAt)
+        scheduler.scheduleWhileIdle(next)
     }
 
     private fun nextEvaluationAt(now: Instant, zone: ZoneId, settings: ReminderSettings, lastNotifiedAt: Long?): Instant {
@@ -172,20 +183,41 @@ class ReminderEngine(
         database.withTransaction {
             when (action) {
                 ReminderAction.COMPLETE -> complete(taskId)
-                ReminderAction.SNOOZE, ReminderAction.DISMISS -> {
-                    val current = requireNotNull(dao.task(taskId))
-                    dao.updateTask(current.copy(snoozedUntil = now.plus(snoozeDuration).toEpochMilli()))
-                }
+                ReminderAction.SNOOZE, ReminderAction.DISMISS -> snooze(taskId, now)
             }
-            if (reminder.deliveredAt == null) {
-                val state = dao.state()
-                val prepared = reminder.preparedAt
-                dao.saveState(state.copy(lastNotifiedAt = maxOf(state.lastNotifiedAt ?: prepared, prepared)))
-            }
+            // The user acted on it, so a prepared reminder was shown.
+            if (reminder.deliveredAt == null) recordNotifiedAt(reminder.preparedAt)
             dao.deleteTaskReminders(taskId)
         }
         cancelMatching(related)
         scheduler.requestEvaluation()
+    }
+
+    private suspend fun snooze(taskId: Long, now: Instant) {
+        val task = requireNotNull(dao.task(taskId))
+        dao.updateTask(task.copy(snoozedUntil = now.plus(snoozeDuration).toEpochMilli()))
+    }
+
+    /** Never moves the shared cadence backwards. */
+    private suspend fun recordNotifiedAt(at: Long) {
+        val state = dao.state()
+        dao.saveState(state.copy(lastNotifiedAt = maxOf(state.lastNotifiedAt ?: at, at)))
+    }
+
+    private enum class StoredReminderFate { KEEP, CONFIRM_DELIVERY, DISCARD, SNOOZE_DISMISSED }
+
+    /** Decides how a stored reminder matches the OS notification with the same ID. */
+    private fun storedReminderFate(reminder: ActiveReminderEntity, valid: Boolean, osToken: String?, now: Instant) = when {
+        !valid -> StoredReminderFate.DISCARD
+        osToken == reminder.token ->
+            if (reminder.deliveredAt == null) StoredReminderFate.CONFIRM_DELIVERY else StoredReminderFate.KEEP
+        // Another generation has the same OS ID; neither token is a dismissal of the saved reminder.
+        osToken != null -> StoredReminderFate.DISCARD
+        reminder.deliveredAt == null -> StoredReminderFate.DISCARD
+        // The delete intent normally snoozes immediately. Keep the row while a
+        // delayed broadcast may still arrive, then recover if it never does.
+        now.isBefore(Instant.ofEpochMilli(reminder.deliveredAt).plus(osVisibilityGrace)) -> StoredReminderFate.KEEP
+        else -> StoredReminderFate.SNOOZE_DISMISSED
     }
 
     private suspend fun reconcileLocked() {
@@ -196,54 +228,45 @@ class ReminderEngine(
         val reminders = dao.activeReminders()
         val known = reminders.associate { it.notificationId to it.token }
         for ((id, token) in os) if (known[id] != token) gateway.cancel(id)
-        val removedTasks = mutableSetOf<Long>()
+        val snoozedTasks = mutableSetOf<Long>()
         for (reminder in reminders) {
-            if (reminder.taskId in removedTasks) continue
-            val task = dao.taskWithCompletions(reminder.taskId)
-            if (!isActiveValid(reminder, task, now, zone, settings) || !gateway.canNotify()) {
-                database.withTransaction { dao.deleteActiveReminder(reminder.notificationId) }
-                if (os[reminder.notificationId] == reminder.token) gateway.cancel(reminder.notificationId)
-            } else if (os[reminder.notificationId] == reminder.token) {
-                if (reminder.deliveredAt == null) database.withTransaction {
+            if (reminder.taskId in snoozedTasks) continue
+            val valid = isActiveValid(reminder, dao.taskWithCompletions(reminder.taskId), now, zone, settings) && gateway.canNotify()
+            when (storedReminderFate(reminder, valid, os[reminder.notificationId], now)) {
+                StoredReminderFate.KEEP -> Unit
+                StoredReminderFate.CONFIRM_DELIVERY -> database.withTransaction {
                     dao.markDelivered(reminder.notificationId, reminder.preparedAt)
-                    val state = dao.state()
-                    dao.saveState(state.copy(lastNotifiedAt = maxOf(state.lastNotifiedAt ?: reminder.preparedAt, reminder.preparedAt)))
+                    recordNotifiedAt(reminder.preparedAt)
                 }
-            } else if (os[reminder.notificationId] != null) {
-                // Another generation has the same OS ID; neither token is a
-                // dismissal of the saved reminder.
-                database.withTransaction { dao.deleteActiveReminder(reminder.notificationId) }
-            } else if (reminder.deliveredAt == null) {
-                database.withTransaction { dao.deleteActiveReminder(reminder.notificationId) }
-            } else if (!now.isBefore(Instant.ofEpochMilli(reminder.deliveredAt).plus(osVisibilityGrace))) {
-                // The delete intent normally snoozes immediately. Keep the row while a
-                // delayed broadcast may still arrive, then recover if it never does.
-                val related = dao.activeReminders().filter { it.taskId == reminder.taskId }
-                database.withTransaction {
-                    val current = requireNotNull(dao.task(reminder.taskId))
-                    dao.updateTask(current.copy(snoozedUntil = now.plus(snoozeDuration).toEpochMilli()))
-                    dao.deleteTaskReminders(reminder.taskId)
+                StoredReminderFate.DISCARD -> {
+                    database.withTransaction { dao.deleteActiveReminder(reminder.notificationId) }
+                    cancelVisible(listOf(reminder), os)
                 }
-                for (item in related) if (os[item.notificationId] == item.token) gateway.cancel(item.notificationId)
-                removedTasks += reminder.taskId
+                StoredReminderFate.SNOOZE_DISMISSED -> {
+                    val related = dao.activeReminders().filter { it.taskId == reminder.taskId }
+                    database.withTransaction {
+                        snooze(reminder.taskId, now)
+                        dao.deleteTaskReminders(reminder.taskId)
+                    }
+                    cancelVisible(related, os)
+                    snoozedTasks += reminder.taskId
+                }
             }
         }
     }
 
-    private fun isActiveValid(reminder: ActiveReminderEntity, task: TaskWithCompletions?, now: Instant, zone: ZoneId, settings: ReminderSettings): Boolean =
-        reminder.localDate == now.atZone(zone).toLocalDate().toString() && task != null &&
-            ReminderPolicy.select(listOf(task.policy(now.atZone(zone).toLocalDate())), now, zone, settings, null) == reminder.taskId
-
-    private fun cancelMatching(reminders: List<ActiveReminderEntity>) {
-        if (reminders.isEmpty()) return
-        val os = gateway.activeTokens()
-        for (reminder in reminders) if (os[reminder.notificationId] == reminder.token) gateway.cancel(reminder.notificationId)
+    private fun isActiveValid(reminder: ActiveReminderEntity, task: TaskWithCompletions?, now: Instant, zone: ZoneId, settings: ReminderSettings): Boolean {
+        val today = now.atZone(zone).toLocalDate()
+        return reminder.localDate == today.toString() && task != null &&
+            ReminderPolicy.isWithinHours(now, zone, settings) && task.reminderTask(today).isDue(now, today)
     }
 
-    private fun TaskWithCompletions.policy(today: LocalDate): ReminderTask {
-        val latest = completions.maxByOrNull { it.completedAt }
-        return ReminderTask(task.id, Instant.ofEpochMilli(task.createdAt), task.recurrenceDays, task.recurrenceHours, task.archived,
-            latest?.completedAt?.let(Instant::ofEpochMilli), latest?.localDate?.let(LocalDate::parse),
-            completions.any { it.localDate == today.toString() }, task.snoozedUntil?.let(Instant::ofEpochMilli))
+    private fun cancelMatching(reminders: List<ActiveReminderEntity>) {
+        if (reminders.isNotEmpty()) cancelVisible(reminders, gateway.activeTokens())
+    }
+
+    /** Cancels only OS notifications still showing these reminders' tokens. */
+    private fun cancelVisible(reminders: List<ActiveReminderEntity>, os: Map<Int, String>) {
+        for (reminder in reminders) if (os[reminder.notificationId] == reminder.token) gateway.cancel(reminder.notificationId)
     }
 }

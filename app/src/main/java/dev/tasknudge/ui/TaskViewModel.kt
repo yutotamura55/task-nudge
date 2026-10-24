@@ -2,11 +2,7 @@ package dev.tasknudge.ui
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import dev.tasknudge.core.ReminderSettings
-import dev.tasknudge.core.notificationIntervalOptions
-import dev.tasknudge.core.validateSettings
-import dev.tasknudge.core.validateTaskInput
-import dev.tasknudge.core.validateBulkTaskInput
+import dev.tasknudge.core.*
 import dev.tasknudge.data.TaskRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -68,28 +64,22 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
 
     fun saveTask(id: Long?, title: String, recurrence: String, sessionId: Long = state.value.operation.sessionId, hourly: Boolean = false) {
         if (!canSubmit(sessionId)) return
-        val days = recurrence.toIntOrNull()
-        val titleError = if (title.trim().length !in 1..100) "タイトルは1〜100文字で入力してください" else null
-        val recurrenceError = if (days == null || days !in (if (hourly) 1..24 else 1..365))
-            if (hourly) "繰り返しは1〜24時間の整数で入力してください" else "繰り返しは1〜365日の整数で入力してください" else null
-        mutableState.update { it.copy(titleError = titleError, recurrenceError = recurrenceError) }
+        val value = recurrence.toIntOrNull()
+        val titleError = titleError(title)
+        val recurrenceError = recurrenceError(value, hourly)
+        mutableState.update { it.copy(titleError = titleError?.message(), recurrenceError = recurrenceError?.message()) }
         if (titleError != null || recurrenceError != null) return
-        val input = validateTaskInput(title, if (hourly) 1 else days!!)
-        mutate(sessionId) { OperationResult.TaskSaved(repository.saveTask(id, input.title, input.recurrenceDays, if (hourly) days else null)) }
+        // Hourly tasks keep the daily column at its default value.
+        val input = validateTaskInput(title, if (hourly) 1 else value!!)
+        mutate(sessionId) { OperationResult.TaskSaved(repository.saveTask(id, input.title, input.recurrenceDays, if (hourly) value else null)) }
     }
 
     fun saveTasks(text: String, recurrence: String, sessionId: Long = state.value.operation.sessionId) {
         if (!canSubmit(sessionId)) return
         val days = recurrence.toIntOrNull()
-        val titles = text.lines().map(String::trim).filter(String::isNotEmpty)
-        val bulkError = when {
-            titles.isEmpty() -> "タスクを1行以上入力してください"
-            titles.size > 100 -> "一度に追加できるタスクは100件までです"
-            titles.any { it.length > 100 } -> "各タスク名は前後の空白を除き100文字以内で入力してください"
-            else -> null
-        }
-        val recurrenceError = if (days == null || days !in 1..365) "繰り返しは1〜365日の整数で入力してください" else null
-        mutableState.update { it.copy(bulkError = bulkError, recurrenceError = recurrenceError) }
+        val bulkError = bulkTitlesError(bulkTitles(text))
+        val recurrenceError = recurrenceError(days)
+        mutableState.update { it.copy(bulkError = bulkError?.message(), recurrenceError = recurrenceError?.message()) }
         if (bulkError != null || recurrenceError != null) return
         val inputs = validateBulkTaskInput(text, days!!)
         mutate(sessionId) { OperationResult.TasksSaved(repository.saveTasks(inputs).size) }
@@ -100,9 +90,9 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
         val startHour = start.toIntOrNull()
         val endHour = end.toIntOrNull()
         val settings = if (startHour != null && endHour != null) ReminderSettings(startHour, endHour, interval) else null
-        val valid = settings != null && runCatching { validateSettings(settings) }.isSuccess
-        mutableState.update { it.copy(settingsError = if (valid) null else "開始は0〜23時、終了は1〜24時の整数で、開始より後に設定してください。間隔は${notificationIntervalOptions.joinToString("・")}分です。") }
-        if (!valid) return
+        val error = if (settings == null) InputError.SETTINGS else settingsError(settings)
+        mutableState.update { it.copy(settingsError = error?.message()) }
+        if (error != null) return
         mutate(sessionId) { repository.saveSettings(settings!!); OperationResult.SettingsSaved }
     }
 
@@ -121,4 +111,15 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
             mutableState.update { if (it.operation.sessionId == sessionId) it.copy(operation = ScreenOperation(sessionId, result)) else it }
         }
     }
+}
+
+internal fun InputError.message(): String = when (this) {
+    InputError.TITLE_LENGTH -> "タイトルは${titleLengthRange.first}〜${titleLengthRange.last}文字で入力してください"
+    InputError.DAILY_RECURRENCE -> "繰り返しは${dailyRecurrenceRange.first}〜${dailyRecurrenceRange.last}日の整数で入力してください"
+    InputError.HOURLY_RECURRENCE -> "繰り返しは${hourlyRecurrenceRange.first}〜${hourlyRecurrenceRange.last}時間の整数で入力してください"
+    InputError.BULK_EMPTY -> "タスクを1行以上入力してください"
+    InputError.BULK_TOO_MANY -> "一度に追加できるタスクは${maxBulkTasks}件までです"
+    InputError.BULK_TITLE_LENGTH -> "各タスク名は前後の空白を除き${titleLengthRange.last}文字以内で入力してください"
+    InputError.SETTINGS -> "開始は${startHourRange.first}〜${startHourRange.last}時、終了は${endHourRange.first}〜${endHourRange.last}時の整数で、" +
+        "開始より後に設定してください。間隔は${notificationIntervalOptions.joinToString("・")}分です。"
 }

@@ -327,6 +327,47 @@ class ReminderEngineTest {
         catch (_: CancellationException) { }
         assertEquals(1, repo.snapshots.first().tasks.size)
     }
+    @Test fun hourlyManualCompletionIsAcceptedExactlyAtTheInterval() = runTest {
+        val id = repo.saveTask(null, "水を飲む", recurrenceHours = 2)
+        repo.completeTask(id)
+        clock.advance(Duration.ofHours(2).minusSeconds(1)); repo.completeTask(id)
+        assertEquals(1, repo.snapshots.first().tasks.single().completions.size)
+        clock.advance(Duration.ofSeconds(1)); repo.completeTask(id)
+        assertEquals(2, repo.snapshots.first().tasks.single().completions.size)
+    }
+    @Test fun dailyManualCompletionIsAcceptedOnTheNextDateBeforeRecurrenceIsDue() = runTest {
+        val id = repo.saveTask(null, "首", 3)
+        repo.completeTask(id)
+        clock.advance(Duration.ofDays(1)); repo.completeTask(id)
+        assertEquals(2, repo.snapshots.first().tasks.single().completions.size)
+        engine.evaluate(); assertEquals(0, gateway.posts)
+    }
+    @Test fun deliveredReminderMissingFromOsSnoozesExactlyAtTheGraceBoundary() = runTest {
+        val id = repo.saveTask(null, "首"); reserve(id, "delivered", true)
+        clock.advance(Duration.ofMinutes(5))
+        newEngine().evaluate()
+        assertEquals(clock.instant().plusSeconds(86400), repo.snapshots.first().tasks.single().snoozedUntil)
+        assertTrue(db.dao().activeReminders().isEmpty())
+    }
+    @Test fun dismissingOneTaskCancelsAllOfItsVisibleRemindersOnly() = runTest {
+        repo.saveSettings(ReminderSettings(0, 24, 15))
+        val first = repo.saveTask(null, "首"); val second = repo.saveTask(null, "腕")
+        engine.evaluate(); val firstToken = gateway.visibleToken!!
+        clock.advance(Duration.ofMinutes(15)); engine.evaluate()
+        clock.advance(Duration.ofMinutes(15)); engine.evaluate()
+        assertEquals(3, gateway.activeCount)
+        engine.handleAction(first, firstToken, ReminderAction.SNOOZE)
+        assertEquals(1, gateway.activeCount)
+        assertEquals(listOf(second), db.dao().activeReminders().map { it.taskId })
+        assertNotNull(repo.snapshots.first().tasks.first { it.id == first }.snoozedUntil)
+    }
+    @Test fun permissionLossDiscardsStoredRemindersWithoutSnoozing() = runTest {
+        repo.saveTask(null, "首"); engine.evaluate()
+        gateway.allowed = false; engine.evaluate()
+        assertTrue(db.dao().activeReminders().isEmpty())
+        assertNull(gateway.visibleToken)
+        assertNull(repo.snapshots.first().tasks.single().snoozedUntil)
+    }
     private suspend fun reserve(id: Long, token: String, delivered: Boolean) {
         db.dao().insertActiveReminder(ActiveReminderEntity(taskId = id, token = token, localDate = "2026-10-01", preparedAt = clock.millis(), deliveredAt = if (delivered) clock.millis() else null))
         if (delivered) db.dao().saveState(ReminderStateEntity(lastNotifiedAt = clock.millis()))

@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import dev.tasknudge.core.*
 
 @Composable
 fun TaskBulkEditorScreen(state: TaskUiState, onSave: (String, String) -> Unit) {
@@ -38,7 +39,7 @@ fun TaskBulkEditorScreen(state: TaskUiState, onSave: (String, String) -> Unit) {
                 NonWrappingBulkInput(text, { text = it })
             }
             Text(
-                state.bulkError ?: "一度に100件まで。各タスク名は100文字以内。",
+                state.bulkError ?: "一度に${maxBulkTasks}件まで。各タスク名は${titleLengthRange.last}文字以内。",
                 style = MaterialTheme.typography.bodySmall,
                 color = if (state.bulkError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
             )
@@ -49,7 +50,7 @@ fun TaskBulkEditorScreen(state: TaskUiState, onSave: (String, String) -> Unit) {
             modifier = Modifier.fillMaxWidth(), singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             isError = state.recurrenceError != null,
-            supportingText = { Text(state.recurrenceError ?: "全件共通。1〜365日、初期値は1日です。") },
+            supportingText = { Text(state.recurrenceError ?: "全件共通。${dailyRecurrenceRange.first}〜${dailyRecurrenceRange.last}日、初期値は1日です。") },
         )
         Button(onClick = { onSave(text, recurrence) }, enabled = state.canSubmit, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
             Text(if (state.saving) "保存中…" else if (!state.canSubmit) "保存済み" else "まとめて保存")

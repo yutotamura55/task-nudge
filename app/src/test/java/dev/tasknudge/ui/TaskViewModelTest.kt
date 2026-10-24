@@ -37,6 +37,29 @@ class TaskViewModelTest {
         repo.gate!!.complete(Unit); runCurrent()
         assertEquals(ScreenOperation(current), vm.state.value.operation)
     }
+    @Test fun validationMessagesStateTheAcceptedRanges() = runTest(dispatcher) {
+        val repo = FakeRepository(); val vm = TaskViewModel(repo)
+        vm.saveTask(null, " ", "0"); runCurrent()
+        assertEquals("タイトルは1〜100文字で入力してください", vm.state.value.titleError)
+        assertEquals("繰り返しは1〜365日の整数で入力してください", vm.state.value.recurrenceError)
+        vm.saveTask(null, "首", "0", hourly = true); runCurrent()
+        assertNull(vm.state.value.titleError)
+        assertEquals("繰り返しは1〜24時間の整数で入力してください", vm.state.value.recurrenceError)
+        for ((text, message) in listOf(
+            " \n " to "タスクを1行以上入力してください",
+            (1..101).joinToString("\n") { "首$it" } to "一度に追加できるタスクは100件までです",
+            "首\n${"長".repeat(101)}" to "各タスク名は前後の空白を除き100文字以内で入力してください",
+        )) {
+            vm.saveTasks(text, "1"); runCurrent()
+            assertEquals(message, vm.state.value.bulkError)
+        }
+        vm.saveTasks("首", "366"); runCurrent()
+        assertNull(vm.state.value.bulkError)
+        assertEquals("繰り返しは1〜365日の整数で入力してください", vm.state.value.recurrenceError)
+        vm.saveSettings("9", "x", 30); runCurrent()
+        assertEquals("開始は0〜23時、終了は1〜24時の整数で、開始より後に設定してください。間隔は5・10・15・30・60・120分です。", vm.state.value.settingsError)
+        assertTrue(repo.saved.isEmpty() && repo.bulkSaved.isEmpty() && repo.settings.isEmpty())
+    }
     private val dispatcher = StandardTestDispatcher()
     @Before fun setup() { Dispatchers.setMain(dispatcher) }
     @After fun cleanup() { Dispatchers.resetMain() }
