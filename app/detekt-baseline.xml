@@ -1,0 +1,182 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>CognitiveComplexMethod:TaskBulkEditorScreen.kt$@Composable private fun NonWrappingBulkInput(value: String, onValueChange: (String) -&gt; Unit)</ID>
+    <ID>CognitiveComplexMethod:TaskDetailScreen.kt$@Composable fun TaskDetailScreen(task: TaskSnapshot, canSubmit: Boolean, now: Instant, zone: ZoneId, actions: TaskDetailActions)</ID>
+    <ID>CognitiveComplexMethod:TaskEditorScreen.kt$@Composable fun TaskEditorScreen(task: TaskSnapshot?, state: TaskUiState, onSave: (String, String, Boolean) -&gt; Unit)</ID>
+    <ID>CognitiveComplexMethod:TaskListScreen.kt$@Composable fun TaskListScreen(content: TaskListContent, actions: TaskListActions)</ID>
+    <ID>CognitiveComplexMethod:TaskNudgeApp.kt$@Composable fun TaskNudgeApp( repository: TaskRepository, notificationsEnabled: Boolean, onEnableNotifications: () -&gt; Unit, initialTaskId: Long? = null, clock: Clock = Clock.systemUTC(), zoneProvider: () -&gt; ZoneId = { ZoneId.systemDefault() }, exactAlarmAccessGranted: Boolean = true, onEnableExactAlarm: () -&gt; Unit = {}, )</ID>
+    <ID>CyclomaticComplexMethod:TaskEditorScreen.kt$@Composable fun TaskEditorScreen(task: TaskSnapshot?, state: TaskUiState, onSave: (String, String, Boolean) -&gt; Unit)</ID>
+    <ID>CyclomaticComplexMethod:TaskNudgeApp.kt$@Composable fun TaskNudgeApp( repository: TaskRepository, notificationsEnabled: Boolean, onEnableNotifications: () -&gt; Unit, initialTaskId: Long? = null, clock: Clock = Clock.systemUTC(), zoneProvider: () -&gt; ZoneId = { ZoneId.systemDefault() }, exactAlarmAccessGranted: Boolean = true, onEnableExactAlarm: () -&gt; Unit = {}, )</ID>
+    <ID>EmptyElseBlock:ReminderEngineTest.kt$FakeGateway$if (failCancel) error("cancel")</ID>
+    <ID>EmptyFunctionBlock:TaskViewModelTest.kt$FakeRepository${}</ID>
+    <ID>InstanceOfCheckForException:ReminderActionReceiver.kt$ReminderActionReceiver$failure is CancellationException</ID>
+    <ID>InstanceOfCheckForException:ReminderEngine.kt$ReminderEngine$failure is CancellationException</ID>
+    <ID>InstanceOfCheckForException:ReminderWorker.kt$ReminderWorker$failure is CancellationException</ID>
+    <ID>LongMethod:TaskNudgeApp.kt$@Composable fun TaskNudgeApp( repository: TaskRepository, notificationsEnabled: Boolean, onEnableNotifications: () -&gt; Unit, initialTaskId: Long? = null, clock: Clock = Clock.systemUTC(), zoneProvider: () -&gt; ZoneId = { ZoneId.systemDefault() }, exactAlarmAccessGranted: Boolean = true, onEnableExactAlarm: () -&gt; Unit = {}, )</ID>
+    <ID>LongParameterList:TaskListScreen.kt$(task: TaskSnapshot, canSubmit: Boolean, now: Instant, zone: ZoneId, onOpen: () -&gt; Unit, onComplete: () -&gt; Unit)</ID>
+    <ID>LongParameterList:TaskNudgeApp.kt$( repository: TaskRepository, notificationsEnabled: Boolean, onEnableNotifications: () -&gt; Unit, initialTaskId: Long? = null, clock: Clock = Clock.systemUTC(), zoneProvider: () -&gt; ZoneId = { ZoneId.systemDefault() }, exactAlarmAccessGranted: Boolean = true, onEnableExactAlarm: () -&gt; Unit = {}, )</ID>
+    <ID>MagicNumber:AndroidNotificationGateway.kt$AndroidNotificationGateway$33</ID>
+    <ID>MagicNumber:AndroidReminderScheduler.kt$AndroidReminderScheduler$15</ID>
+    <ID>MagicNumber:AndroidReminderScheduler.kt$AndroidReminderScheduler$31</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$31</ID>
+    <ID>MagicNumber:MainActivity.kt$MainActivity$33</ID>
+    <ID>MagicNumber:ReminderAlarmReceiver.kt$ReminderAlarmReceiver$15</ID>
+    <ID>MagicNumber:ReminderAlarmReceiver.kt$ReminderAlarmReceiver$15_000L</ID>
+    <ID>MagicNumber:ReminderBootReceiver.kt$ReminderBootReceiver$31</ID>
+    <ID>MagicNumber:ReminderEngine.kt$ReminderEngine$15</ID>
+    <ID>MagicNumber:TaskNudgeApp.kt$33</ID>
+    <ID>MatchingDeclarationName:TaskDetailScreen.kt$TaskDetailActions</ID>
+    <ID>MatchingDeclarationName:TaskNudgeApp.kt$NotificationEnableAction</ID>
+    <ID>MaxLineLength:AndroidNotificationGateway.kt$AndroidNotificationGateway$(Build.VERSION.SDK_INT &lt; 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)</ID>
+    <ID>MaxLineLength:AndroidNotificationGateway.kt$AndroidNotificationGateway$manager</ID>
+    <ID>MaxLineLength:AndroidReminderScheduler.kt$AndroidReminderScheduler$val request = OneTimeWorkRequestBuilder&lt;ReminderWorker&gt;().setInitialDelay(delay.toMillis(), TimeUnit.MILLISECONDS).build()</ID>
+    <ID>MaxLineLength:AppContainer.kt$AppContainer$database: TaskDatabase = Room.databaseBuilder(context.applicationContext, TaskDatabase::class.java, "task-nudge.db").addMigrations(TaskDatabase.MIGRATION_1_2, TaskDatabase.MIGRATION_2_3).addCallback(TaskDatabase.initializeDefaults).build()</ID>
+    <ID>MaxLineLength:Entities.kt$ActiveReminderEntity$foreignKeys = [ForeignKey(entity = TaskEntity::class, parentColumns = ["id"], childColumns = ["taskId"], onDelete = ForeignKey.CASCADE)]</ID>
+    <ID>MaxLineLength:Entities.kt$CompletionEntity$@Entity(tableName = "completions", foreignKeys = [ForeignKey(entity = TaskEntity::class, parentColumns = ["id"], childColumns = ["taskId"], onDelete = ForeignKey.CASCADE)], indices = [Index("taskId"), Index(value = ["taskId", "localDate", "completedAt"], unique = true)])</ID>
+    <ID>MaxLineLength:Entities.kt$CompletionEntity$data</ID>
+    <ID>MaxLineLength:Entities.kt$ReminderSettingsEntity$data</ID>
+    <ID>MaxLineLength:Entities.kt$TaskWithCompletions</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$NotificationEnableAction.SETTINGS -&gt; startActivity(Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, packageName))</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$TaskNudgeApp</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$exactAlarmAccessGranted = Build.VERSION.SDK_INT &lt; 31 || getSystemService(AlarmManager::class.java).canScheduleExactAlarms()</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$exactAlarmAccessGranted = exactAlarmAccessGranted</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$if (Build.VERSION.SDK_INT &gt;= 33) permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM).setData(Uri.parse("package:$packageName")))</ID>
+    <ID>MaxLineLength:MainActivity.kt$MainActivity$val granted = Build.VERSION.SDK_INT &lt; 33 || ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED</ID>
+    <ID>MaxLineLength:ReminderActionReceiver.kt$ReminderActionReceiver$val action = intent.getStringExtra("action")?.let { name -&gt; ReminderAction.entries.firstOrNull { it.name == name } } ?: return</ID>
+    <ID>MaxLineLength:ReminderBootReceiver.kt$ReminderBootReceiver$if</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine$catch (failure: Exception) { Log.w("ReminderEngine", "Post-commit $operation failed: ${failure.javaClass.simpleName}") }</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine$dao.insertCompletion(CompletionEntity(taskId = id, completedAt = now.toEpochMilli(), localDate = today.toString()))</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine$for (reminder in reminders) if (os[reminder.notificationId] == reminder.token) gateway.cancel(reminder.notificationId)</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine$private</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine$val valid = isActiveValid(reminder, dao.taskWithCompletions(reminder.taskId), now, zone, settings) &amp;&amp; gateway.canNotify()</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine.&lt;no name provided&gt;$dao.insertTask(TaskEntity(title = input.title, recurrenceDays = input.recurrenceDays, createdAt = createdAt))</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine.&lt;no name provided&gt;$dao.saveSettings(dao.settings().copy(startHour = settings.startHour, endHour = settings.endHour, intervalMinutes = settings.intervalMinutes))</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine.&lt;no name provided&gt;$dao.updateTask(task.copy(title = input.title, recurrenceDays = input.recurrenceDays, recurrenceHours = recurrenceHours))</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine.&lt;no name provided&gt;$if</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine.&lt;no name provided&gt;$override suspend fun recordPermissionRequest()</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine.&lt;no name provided&gt;$override suspend fun setArchived(id: Long, archived: Boolean)</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine.&lt;no name provided&gt;$require(inputs.isNotEmpty() &amp;&amp; inputs.size &lt;= maxBulkTasks) { "Bulk input must contain 1 to $maxBulkTasks tasks" }</ID>
+    <ID>MaxLineLength:ReminderEngine.kt$ReminderEngine.&lt;no name provided&gt;$require(recurrenceHours == null || recurrenceError(recurrenceHours, hourly = true) == null) { "Recurrence must be $hourlyRecurrenceRange hours" }</ID>
+    <ID>MaxLineLength:ReminderEngineTest.kt$FakeGateway$override fun cancel(notificationId: Int)</ID>
+    <ID>MaxLineLength:ReminderEngineTest.kt$ReminderEngineTest$assertEquals(setOf(LocalDate.parse("2026-10-01"), LocalDate.parse("2026-09-30")), repo.snapshots.first().tasks.single().completions.map { it.localDate }.toSet())</ID>
+    <ID>MaxLineLength:ReminderEngineTest.kt$ReminderEngineTest$db = Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(), TaskDatabase::class.java).addCallback(TaskDatabase.initializeDefaults).allowMainThreadQueries().build()</ID>
+    <ID>MaxLineLength:ReminderEngineTest.kt$ReminderEngineTest$db.dao().insertActiveReminder(ActiveReminderEntity(taskId = id, token = token, localDate = "2026-10-01", preparedAt = clock.millis(), deliveredAt = if (delivered) clock.millis() else null))</ID>
+    <ID>MaxLineLength:ReminderEngineTest.kt$ReminderEngineTest$db.openHelper.writableDatabase.execSQL("CREATE TRIGGER reject_arm BEFORE INSERT ON tasks WHEN NEW.title = '腕' BEGIN SELECT RAISE(ABORT, 'rejected'); END")</ID>
+    <ID>MaxLineLength:RouteTest.kt$RouteTest$for (route in listOf(Route.TaskList, Route.Editor(null), Route.Bulk, Route.Settings)) assertNull(route.requiredTaskId)</ID>
+    <ID>MaxLineLength:RouteTest.kt$RouteTest$private val routes = listOf(Route.TaskList, Route.Detail(7), Route.Editor(null), Route.Editor(7), Route.Bulk, Route.Settings)</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$Button(onClick = { actions.onSave(start, end, interval) }, enabled = state.canSubmit, modifier = Modifier.fillMaxWidth()) { Text(if (state.saving) "保存中…" else if (!state.canSubmit) "保存済み" else "保存") }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$Column</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$OutlinedTextField</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$Text("データはこの端末内にのみ保存します。クラウド保存・端末移行・エクスポートには対応していません。アプリを削除すると記録も失われます。", style = MaterialTheme.typography.bodyMedium)</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$if (!content.notificationsEnabled) NotificationNotice(content.permissionRequested, actions.onEnableNotifications)</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$notificationIntervalOptions.forEach { minutes -&gt; FilterChip(selected = interval == minutes, onClick = { interval = minutes }, label = { Text("${minutes}分") }, modifier = Modifier.heightIn(min = 48.dp)) }</ID>
+    <ID>MaxLineLength:SettingsScreen.kt$state.settingsError?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("settingsError")) }</ID>
+    <ID>MaxLineLength:TaskBulkEditorScreen.kt$&lt;no name provided&gt;$if (caretX != null &amp;&amp; scrollX &gt; caretX) scrollTo(caretX.toInt().coerceAtLeast(0), scrollY)</ID>
+    <ID>MaxLineLength:TaskBulkEditorScreen.kt$Button</ID>
+    <ID>MaxLineLength:TaskBulkEditorScreen.kt$Column</ID>
+    <ID>MaxLineLength:TaskBulkEditorScreen.kt$border = BorderStroke(1.dp, if (state.bulkError == null) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.error)</ID>
+    <ID>MaxLineLength:TaskBulkEditorScreen.kt$color = if (state.bulkError == null) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error</ID>
+    <ID>MaxLineLength:TaskBulkEditorScreen.kt$if (event.actionMasked == MotionEvent.ACTION_DOWN) view.parent.requestDisallowInterceptTouchEvent(true)</ID>
+    <ID>MaxLineLength:TaskBulkEditorScreen.kt$supportingText = { Text(state.recurrenceError ?: "全件共通。${dailyRecurrenceRange.first}〜${dailyRecurrenceRange.last}日、初期値は1日です。") }</ID>
+    <ID>MaxLineLength:TaskDao.kt$TaskDao$@Query("DELETE FROM active_reminders WHERE notificationId = :notificationId") suspend fun deleteActiveReminder(notificationId: Int)</ID>
+    <ID>MaxLineLength:TaskDao.kt$TaskDao$@Query("SELECT * FROM active_reminders ORDER BY notificationId") suspend fun activeReminders(): List&lt;ActiveReminderEntity&gt;</ID>
+    <ID>MaxLineLength:TaskDao.kt$TaskDao$@Query("SELECT * FROM active_reminders WHERE token = :token") suspend fun activeReminder(token: String): ActiveReminderEntity?</ID>
+    <ID>MaxLineLength:TaskDao.kt$TaskDao$@Query("UPDATE active_reminders SET deliveredAt = :deliveredAt WHERE notificationId = :notificationId") suspend fun markDelivered(notificationId: Int, deliveredAt: Long)</ID>
+    <ID>MaxLineLength:TaskDao.kt$TaskDao$@Transaction @Query("SELECT * FROM tasks ORDER BY createdAt, id") fun observeTasks(): Flow&lt;List&lt;TaskWithCompletions&gt;&gt;</ID>
+    <ID>MaxLineLength:TaskDao.kt$TaskDao$@Transaction @Query("SELECT * FROM tasks WHERE id = :id") suspend fun taskWithCompletions(id: Long): TaskWithCompletions?</ID>
+    <ID>MaxLineLength:TaskDatabase.kt$TaskDatabase$@Database(entities = [TaskEntity::class, CompletionEntity::class, ReminderStateEntity::class, ActiveReminderEntity::class, ReminderSettingsEntity::class], version = 3, exportSchema = true)</ID>
+    <ID>MaxLineLength:TaskDatabase.kt$TaskDatabase.Companion.&lt;no name provided&gt;$db.execSQL("CREATE TABLE IF NOT EXISTS active_reminders (notificationId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, taskId INTEGER NOT NULL, token TEXT NOT NULL, localDate TEXT NOT NULL, preparedAt INTEGER NOT NULL, deliveredAt INTEGER, FOREIGN KEY(taskId) REFERENCES tasks(id) ON UPDATE NO ACTION ON DELETE CASCADE)")</ID>
+    <ID>MaxLineLength:TaskDatabase.kt$TaskDatabase.Companion.&lt;no name provided&gt;$db.execSQL("CREATE TABLE IF NOT EXISTS reminder_state_new (id INTEGER NOT NULL, lastNotifiedAt INTEGER, PRIMARY KEY(id))")</ID>
+    <ID>MaxLineLength:TaskDatabase.kt$TaskDatabase.Companion.&lt;no name provided&gt;$db.execSQL("CREATE UNIQUE INDEX index_completions_taskId_localDate_completedAt ON completions (taskId, localDate, completedAt)")</ID>
+    <ID>MaxLineLength:TaskDatabase.kt$TaskDatabase.Companion.&lt;no name provided&gt;$db.execSQL("INSERT INTO active_reminders (notificationId, taskId, token, localDate, preparedAt, deliveredAt) SELECT 1, activeTaskId, activeToken, activeLocalDate, preparedAt, deliveredAt FROM reminder_state WHERE activeTaskId IS NOT NULL AND activeToken IS NOT NULL AND activeLocalDate IS NOT NULL AND preparedAt IS NOT NULL")</ID>
+    <ID>MaxLineLength:TaskDatabase.kt$TaskDatabase.Companion.&lt;no name provided&gt;$db.execSQL("INSERT INTO reminder_settings (id, startHour, endHour, intervalMinutes, permissionRequested) VALUES (1, 9, 21, 30, 0)")</ID>
+    <ID>MaxLineLength:TaskDatabase.kt$TaskDatabase.Companion.&lt;no name provided&gt;$db.execSQL("INSERT INTO reminder_state_new (id, lastNotifiedAt) SELECT id, lastNotifiedAt FROM reminder_state")</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$assertEquals(-1L, db.dao().insertCompletion(CompletionEntity(taskId = id, completedAt = 1, localDate = "2026-10-01")))</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$assertTrue(db.dao().insertCompletion(CompletionEntity(taskId = id, completedAt = 1, localDate = "2026-10-01")) &gt; 0)</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$assertTrue(upgraded.dao().insertCompletion(CompletionEntity(taskId = 7, completedAt = 2000, localDate = "2026-10-01")) &gt; 0)</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$db = Room.inMemoryDatabaseBuilder(RuntimeEnvironment.getApplication(), TaskDatabase::class.java).addCallback(TaskDatabase.initializeDefaults).allowMainThreadQueries().build()</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$fun open()</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$old.execSQL("CREATE TABLE active_reminders (notificationId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, taskId INTEGER NOT NULL, token TEXT NOT NULL, localDate TEXT NOT NULL, preparedAt INTEGER NOT NULL, deliveredAt INTEGER, FOREIGN KEY(taskId) REFERENCES tasks(id) ON UPDATE NO ACTION ON DELETE CASCADE)")</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$old.execSQL("CREATE TABLE completions (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, taskId INTEGER NOT NULL, completedAt INTEGER NOT NULL, localDate TEXT NOT NULL, FOREIGN KEY(taskId) REFERENCES tasks(id) ON UPDATE NO ACTION ON DELETE CASCADE)")</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$old.execSQL("CREATE TABLE reminder_settings (id INTEGER NOT NULL, startHour INTEGER NOT NULL, endHour INTEGER NOT NULL, intervalMinutes INTEGER NOT NULL, permissionRequested INTEGER NOT NULL, PRIMARY KEY(id))")</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$old.execSQL("CREATE TABLE reminder_state (id INTEGER NOT NULL, activeTaskId INTEGER, activeToken TEXT, activeLocalDate TEXT, preparedAt INTEGER, deliveredAt INTEGER, lastNotifiedAt INTEGER, PRIMARY KEY(id))")</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$old.execSQL("CREATE TABLE tasks (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, title TEXT NOT NULL, recurrenceDays INTEGER NOT NULL, createdAt INTEGER NOT NULL, archived INTEGER NOT NULL, snoozedUntil INTEGER)")</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$repository = ReminderEngine(db, Clock.fixed(Instant.parse("2026-10-01T12:00:00Z"), ZoneOffset.UTC), { zone }, SilentGateway(), SilentScheduler()).repository</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$try { repository.saveSettings(ReminderSettings(startHour = 22)); fail("invalid hours accepted") } catch (_: IllegalArgumentException) { }</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$try { repository.saveTask(null, "首", 0); fail("invalid interval accepted") } catch (_: IllegalArgumentException) { }</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$try { repository.saveTask(null, "首", recurrenceHours = 0); fail("invalid hourly interval accepted") } catch (_: IllegalArgumentException) { }</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$try { repository.saveTask(null, title); fail("invalid title accepted") } catch (_: IllegalArgumentException) { }</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$val reloaded = ReminderEngine(db, gateway = SilentGateway(), scheduler = SilentScheduler()).repository.snapshots.first()</ID>
+    <ID>MaxLineLength:TaskDatabaseTest.kt$TaskDatabaseTest$val snapshot = ReminderEngine(stored, gateway = SilentGateway(), scheduler = SilentScheduler()).repository.snapshots.first()</ID>
+    <ID>MaxLineLength:TaskDetailScreen.kt$Text("${task.recurrenceHours?.let { "${it}時間ごと" } ?: "${task.recurrenceDays}日ごと"}・完了 ${task.completions.size}回")</ID>
+    <ID>MaxLineLength:TaskDetailScreen.kt$TextButton(onClick = { actions.onArchive(!task.archived) }, enabled = canSubmit, modifier = Modifier.fillMaxWidth()) { Text(if (task.archived) "再開する" else "停止する") }</ID>
+    <ID>MaxLineLength:TaskDetailScreen.kt$if (!task.archived) Button(onClick = actions.onComplete, enabled = canSubmit &amp;&amp; canComplete, modifier = Modifier.fillMaxWidth()) { Text(completeActionLabel(task, canComplete)) }</ID>
+    <ID>MaxLineLength:TaskEditorScreen.kt$Button</ID>
+    <ID>MaxLineLength:TaskEditorScreen.kt$Column</ID>
+    <ID>MaxLineLength:TaskEditorScreen.kt$OutlinedTextField</ID>
+    <ID>MaxLineLength:TaskEditorScreen.kt$TextButton(onClick = { showRecurrence = !showRecurrence }) { Text(if (showRecurrence) "繰り返しを閉じる" else "繰り返しを設定") }</ID>
+    <ID>MaxLineLength:TaskEditorScreen.kt$isError = state.recurrenceError != null</ID>
+    <ID>MaxLineLength:TaskEditorScreen.kt$modifier = Modifier.fillMaxWidth()</ID>
+    <ID>MaxLineLength:TaskEditorScreen.kt$supportingText = { Text(state.titleError ?: "前後の空白を除き${titleLengthRange.first}〜${titleLengthRange.last}文字") }</ID>
+    <ID>MaxLineLength:TaskEditorScreen.kt$var recurrence by rememberSaveable(task?.id) { mutableStateOf((task?.recurrenceHours ?: task?.recurrenceDays ?: 1).toString()) }</ID>
+    <ID>MaxLineLength:TaskEditorScreen.kt$var showRecurrence by rememberSaveable(task?.id) { mutableStateOf(task != null &amp;&amp; (task.recurrenceDays != 1 || task.recurrenceHours != null)) }</ID>
+    <ID>MaxLineLength:TaskListScreen.kt$Card</ID>
+    <ID>MaxLineLength:TaskListScreen.kt$LazyColumn</ID>
+    <ID>MaxLineLength:TaskListScreen.kt$TaskListActions(onShowArchived = {}, onQueryChange = {}, onEnableNotifications = {}, onOpenTask = {}, onComplete = {})</ID>
+    <ID>MaxLineLength:TaskListScreen.kt$TaskRow(task, content.canSubmit, content.now, content.zone, onOpen = { actions.onOpenTask(task.id) }, onComplete = { actions.onComplete(task.id) })</ID>
+    <ID>MaxLineLength:TaskListScreen.kt$Text("今日の完了 ${active.count { task -&gt; task.completions.any { it.localDate == today } }} / ${active.size}", style = MaterialTheme.typography.titleLarge)</ID>
+    <ID>MaxLineLength:TaskListScreen.kt$Text("完了 ${task.completions.size}回", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)</ID>
+    <ID>MaxLineLength:TaskListScreen.kt$Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = if (largeText) 3 else 2, overflow = TextOverflow.Ellipsis)</ID>
+    <ID>MaxLineLength:TaskListScreen.kt$Text(taskStatus(task, now, zone), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)</ID>
+    <ID>MaxLineLength:TaskListScreen.kt$TextButton</ID>
+    <ID>MaxLineLength:TaskListScreen.kt$private</ID>
+    <ID>MaxLineLength:TaskNudgeApp.kt$AppErrors(state, onRetryRead = vm::retryObservation, onDismissOperationError = { vm.dismissOperationError(owner) })</ID>
+    <ID>MaxLineLength:TaskNudgeApp.kt$TextButton(onClick = onOpenBulk, modifier = Modifier.semantics { contentDescription = "まとめて追加" }) { Text("まとめて追加") }</ID>
+    <ID>MaxLineLength:TaskNudgeApp.kt$TextButton(onClick = onOpenSettings, modifier = Modifier.semantics { contentDescription = "通知設定" }) { Text("設定") }</ID>
+    <ID>MaxLineLength:TaskNudgeApp.kt$if (route != Route.TaskList) TextButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = "戻る" }) { Text("戻る") }</ID>
+    <ID>MaxLineLength:TaskNudgeApp.kt$if (route == Route.TaskList &amp;&amp; snapshot != null) FloatingActionButton(onClick = { navigateFromOwner(Route.Editor(null)) }, modifier = Modifier.semantics { contentDescription = "タスクを追加" }) { Text("＋", style = MaterialTheme.typography.headlineSmall) }</ID>
+    <ID>MaxLineLength:TaskNudgeApp.kt$if (savedId != null &amp;&amp; snapshot.tasks.none { it.id == savedId }) Text("保存済み・データ表示待ち", modifier = Modifier.padding(16.dp))</ID>
+    <ID>MaxLineLength:TaskNudgeApp.kt$is OperationResult.TaskSaved -&gt; if (route is Route.Editor &amp;&amp; snapshot?.tasks?.any { it.id == result.id } == true) navigate(Route.Detail(result.id))</ID>
+    <ID>MaxLineLength:TaskNudgeApp.kt$notificationsEnabled = notificationsEnabled</ID>
+    <ID>MaxLineLength:TaskNudgeApp.kt$private</ID>
+    <ID>MaxLineLength:TaskNudgeApp.kt$screen == Route.Bulk -&gt; TaskBulkEditorScreen(state) { text, recurrence -&gt; vm.saveTasks(text, recurrence, owner) }</ID>
+    <ID>MaxLineLength:TaskNudgeApp.kt$screen is Route.Detail &amp;&amp; task != null</ID>
+    <ID>MaxLineLength:TaskPresentationTest.kt$TaskPresentationTest$val tasks = listOf(task.copy(id = 1, title = "Morning Stretch"), task.copy(id = 2, title = "肩のストレッチ"), task.copy(id = 3, title = "読書"))</ID>
+    <ID>MaxLineLength:TaskViewModel.kt$InputError.SETTINGS</ID>
+    <ID>MaxLineLength:TaskViewModel.kt$TaskViewModel$fun</ID>
+    <ID>MaxLineLength:TaskViewModel.kt$TaskViewModel$fun completeTask(id: Long, sessionId: Long = state.value.operation.sessionId)</ID>
+    <ID>MaxLineLength:TaskViewModel.kt$TaskViewModel$fun setArchived(id: Long, archived: Boolean, sessionId: Long = state.value.operation.sessionId)</ID>
+    <ID>MaxLineLength:TaskViewModel.kt$TaskViewModel$mutableState.update { if (it.operation.sessionId == sessionId) it.copy(operation = ScreenOperation(sessionId, result)) else it }</ID>
+    <ID>MaxLineLength:TaskViewModel.kt$TaskViewModel$mutableState.update { it.copy(observation = ObservationState(snapshot, ObservationStatus.Ready)) }</ID>
+    <ID>MaxLineLength:TaskViewModel.kt$TaskViewModel$mutableState.update { it.copy(observation = it.observation.copy(status = ObservationStatus.Failed("データを読み込めませんでした。再読み込みしてください。"))) }</ID>
+    <ID>MaxLineLength:TaskViewModel.kt$TaskViewModel$mutableState.update { it.copy(operation = ScreenOperation(id), titleError = null, bulkError = null, recurrenceError = null, settingsError = null) }</ID>
+    <ID>MaxLineLength:TaskViewModel.kt$TaskViewModel$mutableState.update { it.copy(titleError = titleError?.message(), recurrenceError = recurrenceError?.message()) }</ID>
+    <ID>MaxLineLength:TaskViewModel.kt$TaskViewModel$mutate(sessionId) { OperationResult.TaskSaved(repository.saveTask(id, input.title, input.recurrenceDays, if (hourly) value else null)) }</ID>
+    <ID>MaxLineLength:TaskViewModel.kt$TaskViewModel$val settings = if (startHour != null &amp;&amp; endHour != null) ReminderSettings(startHour, endHour, interval) else null</ID>
+    <ID>MaxLineLength:TaskViewModelTest.kt$FakeRepository$data.emit(data.replayCache.last().let { it.copy(tasks = it.tasks.map { task -&gt; if (task.id == id) task.copy(archived = archived) else task }) })</ID>
+    <ID>MaxLineLength:TaskViewModelTest.kt$FakeRepository$data.emit(data.replayCache.last().let { it.copy(tasks = it.tasks.map { task -&gt; if (task.id == id) task.copy(completions = listOf(CompletionRecord(1, Instant.EPOCH, LocalDate.of(2026, 10, 1)))) else task }) })</ID>
+    <ID>MaxLineLength:TaskViewModelTest.kt$TaskViewModelTest$for</ID>
+    <ID>MaxLineLength:TaskViewModelTest.kt$TaskViewModelTest$repo.data.emit(AppSnapshot(listOf(task(1), task(2).copy(archived = true)), ReminderSettings(), false))</ID>
+    <ID>MaxLineLength:Theme.kt$dynamicColor &amp;&amp; Build.VERSION.SDK_INT &gt;= 31 -&gt; if (darkTheme) dynamicDarkColorScheme(LocalContext.current) else dynamicLightColorScheme(LocalContext.current)</ID>
+    <ID>MaxLineLength:Theme.kt$fun</ID>
+    <ID>MaxLineLength:Theme.kt$private val DarkColors = darkColorScheme(primary = Color(0xFF82D5C3), onPrimary = Color(0xFF003730), primaryContainer = Color(0xFF005047), secondary = Color(0xFFB1CCC4), background = Color(0xFF0E1513), surface = Color(0xFF0E1513))</ID>
+    <ID>MaxLineLength:Theme.kt$private val LightColors = lightColorScheme(primary = Color(0xFF006A60), onPrimary = Color.White, primaryContainer = Color(0xFF9EF2DF), secondary = Color(0xFF4A635E), background = Color(0xFFF5FAF7), surface = Color(0xFFF5FAF7))</ID>
+    <ID>MaxLineLength:WhileIdleSchedulingTest.kt$WhileIdleSchedulingTest$assertEquals(ReminderAlarmReceiver::class.java.name, shadowOf(alarm.operation).savedIntent.component!!.className)</ID>
+    <ID>ReturnCount:BulkTaskEditText.kt$BulkTaskEditText$override fun onTouchEvent(event: MotionEvent): Boolean</ID>
+    <ID>ReturnCount:ReminderActionReceiver.kt$ReminderActionReceiver$override fun onReceive(context: Context, intent: Intent)</ID>
+    <ID>ReturnCount:ReminderEngine.kt$ReminderEngine$private suspend fun postNextReminderLocked(settings: ReminderSettings)</ID>
+    <ID>ReturnCount:TaskPresentation.kt$fun taskStatus(task: TaskSnapshot, now: Instant, zone: ZoneId): String</ID>
+    <ID>TooGenericExceptionCaught:ReminderActionReceiver.kt$ReminderActionReceiver$failure: Exception</ID>
+    <ID>TooGenericExceptionCaught:ReminderAlarmReceiver.kt$ReminderAlarmReceiver$failure: Exception</ID>
+    <ID>TooGenericExceptionCaught:ReminderEngine.kt$ReminderEngine$failure: Exception</ID>
+    <ID>TooGenericExceptionCaught:ReminderEngine.kt$ReminderEngine$failure: RuntimeException</ID>
+    <ID>TooGenericExceptionCaught:ReminderWorker.kt$ReminderWorker$failure: Exception</ID>
+    <ID>TooManyFunctions:ReminderEngine.kt$ReminderEngine</ID>
+    <ID>TooManyFunctions:TaskDao.kt$TaskDao</ID>
+    <ID>TooManyFunctions:TaskViewModel.kt$TaskViewModel : ViewModel</ID>
+  </CurrentIssues>
+</SmellBaseline>

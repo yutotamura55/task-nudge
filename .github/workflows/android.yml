@@ -48,6 +48,8 @@ jobs:
             app/build/test-results/
             app/build/reports/tests/
             app/build/reports/lint-results-debug.*
+            core/build/reports/detekt/
+            app/build/reports/detekt/
           if-no-files-found: warn
           retention-days: 3
 

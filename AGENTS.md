@@ -15,11 +15,9 @@ Read the workspace AGENTS.md and the design/plan in docs/superpowers before impl
 
 ## Verification
 
-After bootstrap, run `scripts/check.sh` for core tests, app unit tests, lint and debug/test APK builds. Until the script exists, run:
+Run `scripts/check.sh` for core tests, app unit tests, lint, detekt and debug/test APK builds.
 
-```bash
-./gradlew :core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
-```
+Fix new detekt findings first. Adjust a rule in `config/detekt.yml` only with a comment explaining why it does not fit this codebase, and add a finding to a module's `detekt-baseline.xml` only when the PR body records why it stays. See `docs/testing.md`.
 
 Use `scripts/device-smoke.sh` for connected Android instrumentation tests. GitHub Actions runs API35 emulator verification and exports test reports, screenshots and a debug APK. Inspect CI results and fix failures within scope before reporting completion. State any unexecuted device/OEM checks honestly.
 
