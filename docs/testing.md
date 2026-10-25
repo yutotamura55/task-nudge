@@ -47,7 +47,7 @@ USB 端末や KVM をコンテナに渡す構成にしていないためです�
 - 規則は detekt の既定に、`config/detekt.yml` の変更を重ねたものです。
   変更した規則と理由は、このファイルのコメントに書いてあります。
   例：Compose の関数名が大文字で始まることは `FunctionNaming` の対象外にしています。
-- 導入時点（commit `403cc55`）の指摘 194件は、モジュールごとのベースライン（`core/detekt-baseline.xml`、`app/detekt-baseline.xml`）に記録しています。
+- 導入時点（commit `31b0f96`）の指摘 194件は、モジュールごとのベースライン（`core/detekt-baseline.xml`、`app/detekt-baseline.xml`）に記録しています。
   ベースラインにある指摘では失敗しません。
   直すかどうかの判断は Issue #42 に記録しています。
 
@@ -85,7 +85,7 @@ Android 8.0（API 26）以上の**専用テスト端末またはエミュレー�
 
 GitHub Actions は pull request と main への push で起動し、ホスト検証と API 35 Google APIs x86_64 エミュレーターの端末テストを別 runner で並行実行します。PR 作成前の検証にはローカルの `scripts/check.sh` を使います。アップロードに成功した run では、`task-nudge-debug` に APK、`host-test-results` に JVM/lint/detekt、`android-test-results` に instrumentation 結果と実画面画像が3日間保存されます。アップロード失敗はジョブを失敗にしないため、必要な成果物は run の **Artifacts** 一覧で存在を確認してください。ローカルで `/dev/kvm` が使えない場合は、CI の emulator job の成功を確認するまで端末検証を完了と扱いません。
 
-README の3画像は [成功したCI 36952478562](https://github.com/yutotamura55/task-nudge/actions/runs/36952478562) のAPI35実画面です。最終source `6d4db8f` の [PR CI 36963062421](https://github.com/yutotamura55/task-nudge/actions/runs/36963062421) と [push CI 36963059186](https://github.com/yutotamura55/task-nudge/actions/runs/36963059186) は単体101件・端末24件がすべて成功。両runの画像も掲載画像とSHA-256一致を確認しました。現在のchecksは [PR #2](https://github.com/yutotamura55/task-nudge/pull/2) を参照してください。
+README の3画像は [成功したCI 36952478562](https://github.com/yutotamura55/task-nudge/actions/runs/36952478562) のAPI35実画面です。最終source `c1b5dd5` の [PR CI 36963062421](https://github.com/yutotamura55/task-nudge/actions/runs/36963062421) と [push CI 36963059186](https://github.com/yutotamura55/task-nudge/actions/runs/36963059186) は単体101件・端末24件がすべて成功。両runの画像も掲載画像とSHA-256一致を確認しました。現在のchecksは [PR #2](https://github.com/yutotamura55/task-nudge/pull/2) を参照してください。
 
 ## 手動確認（機種ごとの差を見る）
 

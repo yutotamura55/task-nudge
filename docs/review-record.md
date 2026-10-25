@@ -1,11 +1,11 @@
 # MVP レビュー記録
 
-作業 branch: `feat/11-task-reminders`。base: `7b401f0`。完了状態・検証した commit は [development-handoff.md](development-handoff.md) を参照。以下の各節は実施時点の記録。最終結果は末尾を参照。
+作業 branch: `feat/11-task-reminders`。base: `09dacff`。完了状態・検証した commit は [development-handoff.md](development-handoff.md) を参照。以下の各節は実施時点の記録。最終結果は末尾を参照。
 
 ## 全体レビュー
 
 - reviewer: Antigravity CLI (`agy`)、実行ログで確認したモデル `gemini-3.1-pro-high`。
-- 対象: `7b401f0..9cf7924` の全差分と要件。実装側の説明・報告を別途提示せず、読み取り専用、ツール・編集・委任禁止で依頼。CLI 結果 SUCCESS。
+- 対象: `09dacff..2ef0c31` の全差分と要件。実装側の説明・報告を別途提示せず、読み取り専用、ツール・編集・委任禁止で依頼。CLI 結果 SUCCESS。
 - 最初の指摘: 保存前の通知 OS 読み取り失敗で DB 保存も止まることを High と評価。通知 deep link による未保存 draft 破棄は Low の将来改善提案。
 
 ### 保存前の照合に関する再評価
@@ -19,13 +19,13 @@
 ## Task4 の独立レビュー
 
 - reviewer: GitHub Copilot CLI 1.0.90、実呼び出し・応答で確認したモデル `claude-sonnet-5`。
-- 対象: Task4 要件と `910a682..9cf7924` の全差分。読み取り専用、shell/write 禁止、利用可能ツールを view に限定し、ツール・委任禁止で依頼。
+- 対象: Task4 要件と `5ee7eb3..2ef0c31` の全差分。読み取り専用、shell/write 禁止、利用可能ツールを view に限定し、ツール・委任禁止で依頼。
 - 実際に要件と差分47,709文字が渡ったことを確認。exit 0、ファイル変更0、ツール実行なし。
 - High: 端末テスト全件 pass と実画面画像が未提出。これは既知の未完了 gate と一致し、完了報告前に満たす必要がある。
 - Medium: テスト Application の親初期化を省く意図、プロセス終了後の font scale 復元、可変 Clock の withZone、調査用 semantics log。
 - Low: 無効 gateway の post assertion、fixture 差し替え時の通知 cleanup、action SHA の外部確認。action SHA は既に公式 upstream で確認済み。
-- 修正 `7f38921`: 親初期化を省く意図を明記、外側スクリプトで font scale を復元、withZone で可変時刻を共有、調査ログ除去、旧通知 cleanup、表示を確認してからの操作と画像退避・回収を修正。
-- 再レビュー: `9cf7924..7f38921` の追加全差分。実モデル `claude-sonnet-5`、exit 0、ファイル変更0。view ツールのみでテスト3ファイルと本体 Application を閲覧し、修正6点は妥当、残る重大な欠陥なしという結果。shell・編集・委任は実行なし。
+- 修正 `613eeee`: 親初期化を省く意図を明記、外側スクリプトで font scale を復元、withZone で可変時刻を共有、調査ログ除去、旧通知 cleanup、表示を確認してからの操作と画像退避・回収を修正。
+- 再レビュー: `2ef0c31..613eeee` の追加全差分。実モデル `claude-sonnet-5`、exit 0、ファイル変更0。view ツールのみでテスト3ファイルと本体 Application を閲覧し、修正6点は妥当、残る重大な欠陥なしという結果。shell・編集・委任は実行なし。
 - 端末全件 pass・実画像配置・CI artifact 成功は、引き続き完了前に必要なエビデンス待ち。
 
 ## 実行環境の記録
@@ -42,13 +42,13 @@ CI `36886506402` はホスト成功、device23件中20件成功、3失敗。担�
 
 追加ボタンの bounded wait と表示確認を共通化し、invalid input の保存前にスクロール・表示確認、結果の bounded wait を追加。UiAutomationのcommand chainを単純コマンドに分け、画像退避先の実サイズを元ファイルと比較する。
 
-親が `scripts/check.sh` を実行し exit0（94tasks、9executed、85up-to-date）を確認。別モデル Gemini (`gemini-3.1-pro-high`、実行ログ確認済み) の追加差分レビューは SUCCESS、重大な欠陥なし。対象は `7f38921` 以降のテスト修正と workflow 文書更新。ツール実行・編集・委任なし。端末での全件passと画像回収は引き続き未完。
+親が `scripts/check.sh` を実行し exit0（94tasks、9executed、85up-to-date）を確認。別モデル Gemini (`gemini-3.1-pro-high`、実行ログ確認済み) の追加差分レビューは SUCCESS、重大な欠陥なし。対象は `613eeee` 以降のテスト修正と workflow 文書更新。ツール実行・編集・委任なし。端末での全件passと画像回収は引き続き未完。
 
 新しい共有 idea workflow に合わせ、元アイデアはURL参照、開発先Issue [#1](https://github.com/yutotamura55/task-nudge/issues/1) を受け入れ条件・closingの単位とした。
 
 ## 画面描画の同期と最終1件の追加レビュー
 
-- 対象: `0d5a990..9b91e99` の全差分と現在の ScreenshotTest。Copilot CLI の実モデル `claude-sonnet-5`、読み取り専用、shell/write禁止。exit0、ファイル変更0。
+- 対象: `61fb0f7..b4efe5c` の全差分と現在の ScreenshotTest。Copilot CLI の実モデル `claude-sonnet-5`、読み取り専用、shell/write禁止。exit0、ファイル変更0。
 - 重大な欠陥の確定指摘なし。スクロール待機、署名キーの管理、画像の撮影範囲について確認を求める懸念が提示された。
 - 親が確認: 詳細画面は単一 LazyColumn で、直前のヘルパーも同じスクロール対象を使う。その待機はノードの存在確認であり、描画安定待機ではない。Compose の操作同期に加え、今回の端末 CI で実動作を確認する。推測だけの追加修正は行わない。
 - 固定 keystore、signingConfigs、CI の署名キー永続化設定はない。別 run の debug APK の署名互換を保証しないという説明は現構成に合う。
@@ -69,7 +69,7 @@ Clock/zone の所有者を AppContainer にそろえ、UI と engine へ同じ�
 
 ## PR の非同期画面遷移を待つ修正
 
-`beef056` の push CI `36952478562` はホスト成功・端末24/24成功。同じcommitの PR CI `36952524280` は文字拡大テスト1件が失敗。失敗XMLでは詳細の LazyColumn が持つ ScrollToIndex がなく、editor側の ScrollBy と5子要素が残っていた。保存クリックからDB確定・snapshot観測・画面遷移までの非同期処理に対し、テストが古い画面を探索していた。
+`cb4dfe2` の push CI `36952478562` はホスト成功・端末24/24成功。同じcommitの PR CI `36952524280` は文字拡大テスト1件が失敗。失敗XMLでは詳細の LazyColumn が持つ ScrollToIndex がなく、editor側の ScrollBy と5子要素が残っていた。保存クリックからDB確定・snapshot観測・画面遷移までの非同期処理に対し、テストが古い画面を探索していた。
 
 - 修正担当: Copilot CLI、確認済み実モデル `claude-sonnet-5`、exit0。view/editのみ、ScreenshotTest1ファイルに限定。本体変更・shell・委任なし。
 - 保存をクリックした後、遷移先「タスクの詳細」の表示をbounded waitで確認する。既存assertionを維持し、固定sleep・catch・テスト削除なし。
@@ -79,7 +79,7 @@ Clock/zone の所有者を AppContainer にそろえ、UI と engine へ同じ�
 
 ## 最終結果
 
-source `6d4db8f` のPR CI `36963062421`・push CI `36963059186` はともにSUCCESS。各runで単体101件・端末24件、失敗/error/skip0をXML確認。実画像3枚は原寸確認・掲載PNGとのSHA-256一致を確認した。端末全件pass・実画像という必須成果物は解消済み。合意MVPのmaterial findingは残っていない。OS通知照合失敗時の保存制限は上記P2判断として維持する。最終記録の変更は文書のみで、本体・テストは検証済みsourceと同一。
+source `c1b5dd5` のPR CI `36963062421`・push CI `36963059186` はともにSUCCESS。各runで単体101件・端末24件、失敗/error/skip0をXML確認。実画像3枚は原寸確認・掲載PNGとのSHA-256一致を確認した。端末全件pass・実画像という必須成果物は解消済み。合意MVPのmaterial findingは残っていない。OS通知照合失敗時の保存制限は上記P2判断として維持する。最終記録の変更は文書のみで、本体・テストは検証済みsourceと同一。
 
 ## Issue #3 タスク一覧の改善（2026-10-03）
 

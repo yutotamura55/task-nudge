@@ -5,23 +5,23 @@
 ## 依頼と権限
 
 - ユーザーの依頼は、Android MVP の設計・実装・独立レビュー・PR 作成まで。subagent-driven-development 指定。
-- Repository: **private** `yutotamura55/task-nudge`。
+- Repository: `yutotamura55/task-nudge`（当時は非公開）。
 - Source Issue: https://github.com/yutotamura55/my-software-ideas/issues/11 （OPEN）。
-- Branch: `feat/11-task-reminders`。Base: `origin/main` の `7b401f0`。
+- Branch: `feat/11-task-reminders`。Base: `origin/main` の `09dacff`。
 - **main へ push・merge・auto-merge・merge queue を行わない。マージはユーザーのみ。**
 - 新しい共有 workflow に従い、元アイデア #11 は通常 URL で参照。開発先 [task-nudge #1](https://github.com/yutotamura55/task-nudge/issues/1) の受け入れ条件を全部満たせば PR に `Closes #1`。部分完了なら通常リンクと残作業を記す。
 - ユーザーの追加指示: 修正を繰り返してテストを通すだけではなく、設計の変更容易性・保守性を評価する。トークン制限後や他 AI への引き継ぎでも再開可能にする。
 
 ## 再開場所
 
-同じ環境では `/home/y-tamura/workspace/task-nudge/.worktrees/mvp` を使う。親 checkout は `/home/y-tamura/workspace/task-nudge`。
+同じ環境では、リポジトリの checkout の下にある `.worktrees/mvp` を使う。
 
 ```bash
 git status --short
 git log -8 --oneline
 ```
 
-未コミット変更は中断された実装である。消さず、最新の記録と比較して続行する。別環境では private repo を `gh repo clone` し、`feat/11-task-reminders` を checkout する。リポジトリ・workspace の AGENTS.md を最初に読む。
+未コミット変更は中断された実装である。消さず、最新の記録と比較して続行する。別環境ではリポジトリを `gh repo clone` し、`feat/11-task-reminders` を checkout する。リポジトリ・workspace の AGENTS.md を最初に読む。
 
 詳細なローカル SDD 記録は `.superpowers/sdd/2026-09-30-task-nudge/`（gitignored）の `progress.md`、各 `*-report.md`、brief、review diff。この文書は別環境でも読める要約である。
 
@@ -40,11 +40,11 @@ git log -8 --oneline
 
 | 単位 | Commit | 検証・独立レビュー |
 |---|---|---|
-| 初期設計・計画 | `3c57634` | Spec/plan/AGENTS 保存済み |
-| Task1 build/pure policy | `d58ecf4` | core34件、lint/APKs成功。gpt-6.1-sol high: blocking findingなし |
-| Task2 Room/notification | `9ef767e` | core34/app34件、lint/APKs成功。gpt-6-astra high: blocking findingなし |
-| Task3 Japanese UI | `2eca5b9` + `2d617b2` | core34/app52件、lint0 errors/1kapt warning、両APK成功。保存連打/画面所有者の2指摘を修正し scoped review成功 |
-| 再設計文書 | `0832100` | 下記の architecture review に基づく |
+| 初期設計・計画 | `23aac83` | Spec/plan/AGENTS 保存済み |
+| Task1 build/pure policy | `f53b5b4` | core34件、lint/APKs成功。gpt-6.1-sol high: blocking findingなし |
+| Task2 Room/notification | `b969c62` | core34/app34件、lint/APKs成功。gpt-6-astra high: blocking findingなし |
+| Task3 Japanese UI | `52880da` + `c8b71f0` | core34/app52件、lint0 errors/1kapt warning、両APK成功。保存連打/画面所有者の2指摘を修正し scoped review成功 |
+| 再設計文書 | `9bfec7c` | 下記の architecture review に基づく |
 
 Task1–3 の実装・修正担当は **gpt-6.1-sol high**。architecture review は **gpt-6-astra high**。実装担当の自己レビューを独立レビューの代用にしない。
 
@@ -58,17 +58,17 @@ Task1–3 の実装・修正担当は **gpt-6.1-sol high**。architecture review
 
 決定は、コマンド確定・データ観測・画面所有者の境界を限定して再設計すること。通知の prepared/delivered recovery、mutex、Room は維持する。判断が不十分なら追加の境界修正が必要になる。
 
-実装担当は `/root/command_boundaries_resume`。保存された WIP `b913463` から再開し、次を確認・修正した:
+実装担当は `/root/command_boundaries_resume`。保存された WIP `b0f9674` から再開し、次を確認・修正した:
 
 - Engine の commit 後 cancel/reconcile/schedule を回復可能な処理に分け、境界と例外クラスだけローカル記録。commit 前処理と mutex は維持。
 - TaskViewModel の session/operation state と再試行可能な観測を確認。ViewModel 24件・ReminderEngine 28件を含む app 67件、core 34件が成功した。
 - instrumented UI の旧「保存中」期待を「保存済み・データ表示待ち」へ修正。保存結果を表示する前に戻れる結果も追加し、AndroidTest APK まで compile/assemble 成功。**端末上での実行は Task 4。**
 - 指定 gate `:core:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest --max-workers=1` は exit 0。lint 0 errors / 既知の kapt warning 1件。
-- ローカル記録 `.superpowers/sdd/2026-09-30-task-nudge/command-boundaries-report.md` に状態遷移と検証を保存。独立した combined correctness/design review は、旧画面 callback が実行時の新 session/task ID を読む Important 指摘を出した。各 screen callback に生成時の owner/task ID を束縛し、旧 action を保持して新 draft で呼ぶ 4 件の instrumented regression を追加。修正差分の scoped re-review は全指摘解消で完了し、commit `910a682` まで保存済み。
+- ローカル記録 `.superpowers/sdd/2026-09-30-task-nudge/command-boundaries-report.md` に状態遷移と検証を保存。独立した combined correctness/design review は、旧画面 callback が実行時の新 session/task ID を読む Important 指摘を出した。各 screen callback に生成時の owner/task ID を束縛し、旧 action を保持して新 draft で呼ぶ 4 件の instrumented regression を追加。修正差分の scoped re-review は全指摘解消で完了し、commit `5ee7eb3` まで保存済み。
 
 ## 最終検証と PR
 
-- 実装・保存境界再設計・時計共有・独立レビュー・Task4は完了。検証したsource commitは `6d4db8f`。
+- 実装・保存境界再設計・時計共有・独立レビュー・Task4は完了。検証したsource commitは `c1b5dd5`。
 - [PR #2](https://github.com/yutotamura55/task-nudge/pull/2) は `main` 向け。マージはユーザーが行う。現在のdraft/ready・checksはPRを参照する。
 - [PR CI 36963062421](https://github.com/yutotamura55/task-nudge/actions/runs/36963062421) と [push CI 36963059186](https://github.com/yutotamura55/task-nudge/actions/runs/36963059186) はともにSUCCESS。各XMLは単体101件、API35端末24件、失敗・error・skipいずれも0件。lint・debug/test APKビルドも成功。
 - 一覧・詳細履歴・設定の3PNGを原寸確認。両runのartifactと掲載画像のSHA-256はすべて一致。「今日の完了1/2」「今日完了済み」無効、履歴1件、時間9–21/30分を確認。README、testing、review-recordに証跡を保存。
