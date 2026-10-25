@@ -1,0 +1,24 @@
+<?xml version="1.0" ?>
+<SmellBaseline>
+  <ManuallySuppressedIssues/>
+  <CurrentIssues>
+    <ID>ComplexCondition:TaskInput.kt$settings.startHour in startHourRange &amp;&amp; settings.endHour in endHourRange &amp;&amp; settings.startHour &lt; settings.endHour &amp;&amp; settings.intervalMinutes in notificationIntervalOptions</ID>
+    <ID>LongParameterList:ReminderPolicy.kt$ReminderPolicy$( tasks: List&lt;ReminderTask&gt;, now: Instant, zone: ZoneId, settings: ReminderSettings, lastNotifiedAt: Instant?, lastNotifiedByTask: Map&lt;Long, Instant&gt; = emptyMap(), )</ID>
+    <ID>MaxLineLength:ReminderPolicyTest.kt$ReminderPolicyTest$ReminderTask(1, Instant.parse("2026-09-28T00:00:00Z"), lastCompletedAt = completedAt, lastCompletedDate = date)</ID>
+    <ID>MaxLineLength:ReminderPolicyTest.kt$ReminderPolicyTest$ReminderTask(2, Instant.parse("2026-09-27T00:00:00Z"), lastCompletedAt = completedAt, lastCompletedDate = date)</ID>
+    <ID>MaxLineLength:ReminderPolicyTest.kt$ReminderPolicyTest$assertEquals(1L, ReminderPolicy.select(listOf(task), Instant.parse("2026-03-08T16:00:00Z"), ZoneId.of("America/New_York"), settings, null))</ID>
+    <ID>MaxLineLength:ReminderPolicyTest.kt$ReminderPolicyTest$assertEquals(1L, ReminderPolicy.select(listOf(task), Instant.parse("2026-11-01T17:00:00Z"), ZoneId.of("America/New_York"), settings, null))</ID>
+    <ID>MaxLineLength:ReminderPolicyTest.kt$ReminderPolicyTest$assertEquals(2L, select(listOf(ReminderTask(1, now.minusSeconds(86400), archived = true), ReminderTask(2, now))))</ID>
+    <ID>MaxLineLength:ReminderPolicyTest.kt$ReminderPolicyTest$assertEquals(2L, select(listOf(ReminderTask(1, now.minusSeconds(86400), completedToday = true), ReminderTask(2, now))))</ID>
+    <ID>MaxLineLength:ReminderPolicyTest.kt$ReminderPolicyTest$assertEquals(2L, select(listOf(ReminderTask(1, now.minusSeconds(86400), snoozedUntil = now.plusSeconds(1)), ReminderTask(2, now))))</ID>
+    <ID>MaxLineLength:ReminderPolicyTest.kt$ReminderPolicyTest$assertNull(ReminderPolicy.select(listOf(ReminderTask(1, now, snoozedUntil = now)), now, zone, settings, now.minusSeconds(1799)))</ID>
+    <ID>MaxLineLength:ReminderPolicyTest.kt$ReminderPolicyTest$assertNull(select(listOf(task.copy(lastCompletedAt = now, lastCompletedDate = LocalDate.parse("2026-09-30"), completedToday = true))))</ID>
+    <ID>MaxLineLength:ReminderPolicyTest.kt$ReminderPolicyTest$val task = ReminderTask(1, now.minusSeconds(86400), lastCompletedAt = now.minusSeconds(3600), lastCompletedDate = LocalDate.parse("2026-09-30"))</ID>
+    <ID>MaxLineLength:ReminderPolicyTest.kt$ReminderPolicyTest$val task = ReminderTask(1, now.minusSeconds(86400), lastCompletedAt = now.minusSeconds(3600), lastCompletedDate = LocalDate.parse("2026-10-01"))</ID>
+    <ID>MaxLineLength:TaskInput.kt$InputError$enum</ID>
+    <ID>MaxLineLength:TaskInputTest.kt$TaskInputTest$assertThrows(IllegalArgumentException::class.java) { validateSettings(ReminderSettings(intervalMinutes = minutes)) }</ID>
+    <ID>MaxLineLength:TaskInputTest.kt$TaskInputTest$for</ID>
+    <ID>ReturnCount:ReminderPolicy.kt$ReminderPolicy$fun select( tasks: List&lt;ReminderTask&gt;, now: Instant, zone: ZoneId, settings: ReminderSettings, lastNotifiedAt: Instant?, lastNotifiedByTask: Map&lt;Long, Instant&gt; = emptyMap(), ): Long?</ID>
+    <ID>TopLevelPropertyNaming:TaskInput.kt$const val maxBulkTasks = 100</ID>
+  </CurrentIssues>
+</SmellBaseline>
