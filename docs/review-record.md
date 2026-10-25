@@ -217,3 +217,12 @@ source `6d4db8f` のPR CI `36963062421`・push CI `36963059186` はともにSUCC
 - detekt（同じ設定）の変化：`TaskNudgeApp` は認知的複雑度 56→40、循環的 31→24、126→103 行。`TaskListScreen` は認知的 43→27、`LongMethod` の指摘は解消。新しく `TaskRow` が引数 6 で `LongParameterList` の閾値に並んだ（タスク・操作可否・時刻・タイムゾーン・2つの操作で、まとめる利点は小さい）。`TaskNudgeApp` と `TaskListScreen` は閾値（15）を超えたままで、残りは画面の振り分けと検索の開閉という画面の流れそのもの。#41 でベースラインに記録する。
 - `scripts/container-check.sh` で core・app の単体テスト計143件が失敗・スキップなし。lint は既存の警告のみ、debug APK と計装テスト用 APK のビルドも成功。端末テストは PR の CI で確認する。
 - 全差分を Codex CLI 0.164.0 の `gpt-6.1-sol`（推論 high、`--sandbox read-only`）でレビューした。モデルはセッション記録で確認した。指摘は0件。抽出したコールバックが元の session（`owner`）を保持していること、時刻の更新の開始と停止が変わらないこと、名前付き引数が元の位置と対応していることが確認され、トップバーとタスク行の分離は読む負担を減らしていると評価された。
+
+## Issue #41 detekt の組み込み（2026-10-25）
+
+- detekt 1.23.8 の Gradle プラグインを `core` と `app` に適用し、`scripts/check.sh` で `:core:detekt :app:detekt` を実行するようにした。CI はこのスクリプトを使うので、CI でも実行される。
+- 版：1.23.8 は Kotlin 2.0.21 向けの安定版。Kotlin 2.2.21 のこのリポジトリでも、型解決なしの `detekt` タスクで解析できた。2.0.0 は alpha 版で、最新の alpha.6 は Kotlin 2.4・AGP 9 向けのため採用しなかった。
+- `config/detekt.yml` の変更：`CognitiveComplexMethod` を有効化（閾値 15）、`CyclomaticComplexMethod` で1行の `when` 分岐を数えない、Compose 関数の `FunctionNaming` と `MagicNumber` を対象外、プロパティ宣言の `MagicNumber` を対象外、`@Preview` の `UnusedPrivateMember` を対象外、`WildcardImport` を無効化。`WildcardImport` は既存のコードが一貫して使う書き方なので、ベースラインに入れて新しいファイルだけ禁止するより、規則を外すほうが書き方がそろう。行の長さ（120）は既定のままにし、既存の行はベースラインに入れた。書き換えた行から折り返していく。
+- 導入時点の指摘 194件（`core` 18件、`app` 176件）をモジュールごとのベースラインに記録した。複雑さの数値は #42 の後の計測と同じ（`TaskNudgeApp` は認知的 40、循環的 24、103 行）。
+- 確認：既存のコードで detekt が成功すること、`core` に120文字を超える行を1行足すと `:core:detekt` が失敗することを確かめた。`scripts/container-check.sh` で core・app の単体テスト計143件が失敗・スキップなし、lint は既存の警告のみ、detekt 成功、debug APK と計装テスト用 APK のビルドも成功した。この後に `ignoreSimpleWhenEntries` を足した変更は、ホストの Gradle で detekt だけを再実行して成功を確認した。
+- 全差分を Codex CLI の `gpt-6.1-sol`（推論 high、`--sandbox read-only`）でレビューした。モデルはセッション記録で確認した。指摘は1件（低）：`docs/testing.md` の「記録済みの行を書き換えると新しい指摘になる」は規則によって違い、関数の複雑さは関数の宣言で識別するので、ベースラインにある関数の中で複雑さが増えても失敗しない。採用し、規則ごとの識別方法と、ベースラインにある関数を変えるときはレポートの数値を見ることを書いた。この限界は detekt の設定では解消できない。

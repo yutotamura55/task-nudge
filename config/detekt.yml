@@ -1,0 +1,27 @@
+# Overrides of detekt's default config. See docs/testing.md for how to handle findings.
+
+complexity:
+  CognitiveComplexMethod:
+    active: true
+    threshold: 15
+  CyclomaticComplexMethod:
+    # A when whose branches are single calls, such as the screen router, reads as a table.
+    ignoreSimpleWhenEntries: true
+
+naming:
+  FunctionNaming:
+    # Compose functions are named like types.
+    ignoreAnnotated: ['Composable']
+
+style:
+  MagicNumber:
+    # Layout sizes such as 48.dp are read in place; constants would not explain them better.
+    ignoreAnnotated: ['Composable']
+    # A property name such as titleLengthRange already says what the number means.
+    ignorePropertyDeclaration: true
+  UnusedPrivateMember:
+    # Android Studio uses previews; nothing calls them from code.
+    ignoreAnnotated: ['Preview']
+  WildcardImport:
+    # The codebase imports packages such as androidx.compose.material3.* by wildcard.
+    active: false

@@ -6,5 +6,5 @@ cd "$repo_root"
 gradle_runner="${TASK_NUDGE_GRADLE:-$repo_root/gradlew}"
 
 "$gradle_runner" --no-daemon --max-workers=1 \
-  :core:test :app:testDebugUnitTest :app:lintDebug \
+  :core:test :app:testDebugUnitTest :app:lintDebug :core:detekt :app:detekt \
   :app:assembleDebug :app:assembleDebugAndroidTest
