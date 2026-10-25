@@ -75,6 +75,12 @@ Kotlin を上げて detekt が解析に失敗したら、その時点の detekt 
 
 Android 8.0（API 26）以上の**専用テスト端末またはエミュレーター**を 1 台 `adb devices` で `device` と表示させ、`scripts/device-smoke.sh` を実行します。このスクリプトは接続台数を検査し、`connectedDebugAndroidTest` で debug APK とテスト APK をインストールして全 instrumentation テストを走らせます。このテスト構成は終了後に対象アプリとテスト APK をアンインストールするため、既存の記録がある端末では実行しないでください。画面画像は `build/device-screenshots/` に取得します。テスト結果は `app/build/outputs/androidTest-results/connected/` と `app/build/reports/androidTests/connected/` を確認します。
 
+入力欄にフォーカスすると、Android はアプリにソフトキーボードの領域（WindowInsets の IME）を渡し、画面は `imePadding()` でその分だけ縮みます。
+領域の更新はアプリの外で非同期に起き、Compose のテストはその完了を待ちません。キーボードを無効にしても、領域だけが渡されることがあります（Issue #45）。
+そのため、テストで文字を入力した後は、`closeKeyboard()`（`app/src/androidTest/java/dev/tasknudge/KeyboardSync.kt`）でフォーカスを外し、領域が 0.5 秒続けて消えてから次の操作をします。
+フォーカスを保ったまま位置を測ってスワイプするテストは、`awaitKeyboardAreaSettled()` で領域の高さが 0.5 秒変わらなくなってから測ります。
+キーボードを表示した状態の画面と、キーボードの種類による違いは、この自動テストでは確かめません（#47、#48）。
+
 手動で APK を入れる場合、既存アプリと同じ署名なら `adb install -r app/build/outputs/apk/debug/app-debug.apk` で上書きできます。CI の debug 署名は実行間で固定管理されず、別 run の APK は上書きできる保証がありません。署名が違ってアンインストールすると記録は消えます。テスト APK は `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk` です。個別の原因調査では、両 APK を入れた後に `adb shell am instrument -w dev.tasknudge.test/dev.tasknudge.DeviceTestRunner` を実行できます。`adb logcat` で `ReminderEngine` と `TaskNudge` の記録を確認します。テストは専用のインメモリ Room DB を使い、テスト中の実通知を最後に消します。
 
 GitHub Actions は pull request と main への push で起動し、ホスト検証と API 35 Google APIs x86_64 エミュレーターの端末テストを別 runner で並行実行します。PR 作成前の検証にはローカルの `scripts/check.sh` を使います。アップロードに成功した run では、`task-nudge-debug` に APK、`host-test-results` に JVM/lint/detekt、`android-test-results` に instrumentation 結果と実画面画像が3日間保存されます。アップロード失敗はジョブを失敗にしないため、必要な成果物は run の **Artifacts** 一覧で存在を確認してください。ローカルで `/dev/kvm` が使えない場合は、CI の emulator job の成功を確認するまで端末検証を完了と扱いません。

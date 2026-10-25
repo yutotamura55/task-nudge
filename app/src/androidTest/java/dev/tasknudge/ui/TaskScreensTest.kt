@@ -13,7 +13,6 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Density
 import android.widget.EditText
-import android.view.inputmethod.InputMethodManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -30,6 +29,9 @@ import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.core.TaskInput
 import dev.tasknudge.data.*
 import dev.tasknudge.DeviceTestApplication
+import dev.tasknudge.FailureDiagnostics
+import dev.tasknudge.awaitKeyboardAreaSettled
+import dev.tasknudge.closeKeyboard
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CompletableDeferred
@@ -45,7 +47,8 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 
 class TaskScreensTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val compose = createComposeRule()
+    @get:Rule(order = 1) val diagnostics = FailureDiagnostics()
     private fun launch(repo: ScreenRepository, enabled: Boolean = true, initial: Long? = null, enable: () -> Unit = {}) {
         compose.setContent { TaskNudgeTheme(dynamicColor = false) { TaskNudgeApp(repo, enabled, enable, initial) } }
     }
@@ -56,14 +59,7 @@ class TaskScreensTest {
         }
         compose.onNodeWithText("追加予定：${value.lines().count { it.isNotBlank() }}件").assertExists()
     }
-    private fun dismissKeyboard() {
-        compose.runOnIdle {
-            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
-            val keyboard = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
-            keyboard.hideSoftInputFromWindow(activity.window.decorView.windowToken, 0)
-        }
-        UiDevice.getInstance(InstrumentationRegistry.getInstrumentation()).waitForIdle()
-    }
+    private fun dismissKeyboard() = compose.closeKeyboard()
     private fun tapSave(label: String = "保存") {
         dismissKeyboard()
         compose.onNodeWithText(label).performScrollTo().assertIsDisplayed().performClick()
@@ -109,6 +105,7 @@ class TaskScreensTest {
         launch(repo)
         compose.onNodeWithText("検索").performClick()
         compose.onNodeWithText("タスクを検索").performTextInput("ストレッチ")
+        dismissKeyboard()
         compose.onNodeWithText("検索結果 2件").assertIsDisplayed()
         compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
         compose.onNodeWithText("腕のストレッチ").assertIsDisplayed()
@@ -123,10 +120,12 @@ class TaskScreensTest {
         launch(repo)
         compose.onNodeWithText("検索").performClick()
         compose.onNodeWithText("タスクを検索").performTextInput("肩")
+        dismissKeyboard()
         compose.onNodeWithText("検索結果 0件").assertIsDisplayed()
         compose.onNodeWithText("一致するタスクがありません").assertIsDisplayed()
         compose.onNodeWithText("首のストレッチ").assertDoesNotExist()
         compose.onNodeWithText("タスクを検索").performTextClearance()
+        dismissKeyboard()
         compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
     }
     @Test fun largeTextKeepsTaskNameReadableWithCompletionAction() {
@@ -205,6 +204,7 @@ class TaskScreensTest {
             assertEquals(2, editor.layout.lineCount)
             assertTrue(editor.isHorizontallyScrollable)
         }
+        compose.awaitKeyboardAreaSettled()
         val bounds = Rect()
         compose.runOnIdle {
             val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
@@ -236,6 +236,7 @@ class TaskScreensTest {
                 editor.requestFocus()
                 assertTrue(editor.onTextContextMenuItem(android.R.id.paste))
             }
+            dismissKeyboard()
             compose.onNodeWithText("追加予定：2件").assertIsDisplayed()
             tapSave("まとめて保存")
             compose.waitUntil(10_000) { repo.data.value.tasks.size == 2 }
@@ -248,6 +249,7 @@ class TaskScreensTest {
         val repo = ScreenRepository(); launch(repo)
         compose.onNodeWithContentDescription("まとめて追加").performClick()
         enterBulkText((1..20).joinToString("\n") { "タスク$it" })
+        compose.awaitKeyboardAreaSettled()
         val bounds = Rect()
         compose.runOnIdle {
             val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
@@ -287,6 +289,7 @@ class TaskScreensTest {
             assertTrue("Recomposition must preserve Japanese composing text", BaseInputConnection.getComposingSpanStart(editor.text) >= 0)
             assertTrue(connection.commitText("首", 1))
         }
+        dismissKeyboard()
         compose.onNodeWithText("追加予定：1件").assertIsDisplayed()
         tapSave("まとめて保存")
         compose.waitUntil(10_000) { repo.data.value.tasks.size == 1 }
@@ -352,7 +355,7 @@ class TaskScreensTest {
             editor.requestFocus()
             editor.setSelection(editor.text.length)
         }
-        compose.waitForIdle()
+        compose.awaitKeyboardAreaSettled()
         compose.runOnIdle {
             val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
             val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
@@ -438,6 +441,7 @@ class TaskScreensTest {
         compose.onNodeWithContentDescription("戻る").performClick()
         compose.onNodeWithContentDescription("タスクを追加").performClick()
         compose.onNodeWithText("タイトル").performTextInput("腰の下書き")
+        dismissKeyboard()
         compose.runOnIdle { repo.gate!!.complete(Unit) }
         compose.waitUntil { repo.data.value.tasks.size == 1 }
         compose.onNodeWithText("タイトル").assertIsDisplayed()
@@ -450,12 +454,14 @@ class TaskScreensTest {
         launch(repo, initial = 1)
         compose.onNodeWithText("編集").performClick()
         compose.onNodeWithText("タイトル").performTextReplacement("首の下書き")
+        dismissKeyboard()
         val oldSave = compose.onNodeWithText("保存").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
         compose.onNodeWithContentDescription("戻る").performClick()
         compose.onNodeWithContentDescription("戻る").performClick()
         compose.onNodeWithText("腰").performClick()
         compose.onNodeWithText("編集").performClick()
         compose.onNodeWithText("タイトル").performTextReplacement("腰の下書き")
+        dismissKeyboard()
         compose.runOnIdle { oldSave() }
         compose.onNodeWithText("腰の下書き").assertIsDisplayed()
         compose.onNodeWithText("保存").assertIsEnabled()
@@ -468,10 +474,12 @@ class TaskScreensTest {
         val repo = ScreenRepository(); launch(repo)
         compose.onNodeWithContentDescription("通知設定").performClick()
         compose.onNodeWithText("開始（時）").performTextReplacement("0")
+        dismissKeyboard()
         val oldSave = compose.onNodeWithText("保存").fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
         compose.onNodeWithContentDescription("戻る").performClick()
         compose.onNodeWithContentDescription("タスクを追加").performClick()
         compose.onNodeWithText("タイトル").performTextInput("新しい下書き")
+        dismissKeyboard()
         compose.runOnIdle { oldSave() }
         compose.onNodeWithText("新しい下書き").assertIsDisplayed()
         compose.onNodeWithText("保存").assertIsEnabled()
@@ -507,6 +515,7 @@ class TaskScreensTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithText("タイトルは1〜100文字で入力してください", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText("タイトルは1〜100文字で入力してください").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("タイトル").performTextReplacement("腕")
+        dismissKeyboard()
         compose.onNodeWithText("繰り返しを設定").performClick()
         compose.onNodeWithText("繰り返し（日）").performTextReplacement("0")
         tapSave()
@@ -551,9 +560,11 @@ class TaskScreensTest {
         compose.onNodeWithText(message, useUnmergedTree = true).performScrollTo().assertIsDisplayed()
         assertEquals(ReminderSettings(), repo.data.value.settings)
         compose.onNodeWithText("開始（時）").performTextReplacement("0")
+        dismissKeyboard()
         compose.onNodeWithText("120分").performScrollTo().performClick()
         tapSave()
-        compose.waitUntil(10_000) { repo.data.value.settings == ReminderSettings(0, 24, 120) }
+        runCatching { compose.waitUntil(10_000) { repo.data.value.settings == ReminderSettings(0, 24, 120) } }
+            .onFailure { throw AssertionError("Saved settings: ${repo.data.value.settings}", it) }
     }
     @Test fun editDraftSurvivesStateRestoration() {
         val repo = ScreenRepository()
@@ -561,8 +572,10 @@ class TaskScreensTest {
         restoration.setContent { TaskNudgeTheme(dynamicColor = false) { TaskNudgeApp(repo, true, {}) } }
         compose.onNodeWithContentDescription("タスクを追加").performClick()
         compose.onNodeWithText("タイトル").performTextInput("腰のストレッチ")
+        dismissKeyboard()
         compose.onNodeWithText("繰り返しを設定").performClick()
         compose.onNodeWithText("繰り返し（日）").performTextReplacement("7")
+        dismissKeyboard()
         restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithText("腰のストレッチ").assertIsDisplayed()
         compose.onNodeWithText("7").assertIsDisplayed()
@@ -575,6 +588,7 @@ class TaskScreensTest {
         launch(repo)
         compose.onNodeWithContentDescription("タスクを追加").performClick()
         compose.onNodeWithText("タイトル").performTextInput("水を飲む")
+        dismissKeyboard()
         compose.onNodeWithText("繰り返しを設定").performClick()
         compose.onNodeWithText("時間ごと").performClick()
         compose.onNodeWithText("繰り返し（時間）").performTextReplacement("2")

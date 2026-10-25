@@ -38,6 +38,11 @@ done
 
 test_status=0
 "$gradle_runner" --no-daemon --max-workers=1 :app:connectedDebugAndroidTest || test_status=$?
+if [[ "$test_status" -ne 0 ]]; then
+  # CI may be unable to keep artifacts; print what FailureDiagnostics logged and any ANRs.
+  echo "== Device state logged at failed tests =="
+  grep -h -E "TaskNudgeDiag|ANR in|Input dispatching timed out" app/build/outputs/androidTest-results/connected/debug/*/logcat-*.txt || true
+fi
 
 screenshot_source="/sdcard/Pictures/TaskNudgeTest"
 screenshot_target="$repo_root/build/device-screenshots"
