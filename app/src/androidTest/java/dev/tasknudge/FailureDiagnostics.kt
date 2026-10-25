@@ -13,10 +13,24 @@ import org.junit.runner.Description
  * and the window hierarchy. CI keeps the job log even when artifacts are unavailable;
  * scripts/device-smoke.sh prints these lines after a failed run.
  * Order this rule inside the Compose rule so the tested Activity still exists.
+ * A test that closes its own ActivityScenario calls [captureNow] before closing it,
+ * because the rule sees the failure only after the test body has finished.
  */
 class FailureDiagnostics : TestWatcher() {
-    override fun failed(e: Throwable, description: Description) {
-        val name = description.methodName
+    private var testName = ""
+    private var captured = false
+
+    override fun starting(description: Description) {
+        testName = description.methodName
+        captured = false
+    }
+
+    override fun failed(e: Throwable, description: Description) = captureNow()
+
+    fun captureNow() {
+        if (captured) return
+        captured = true
+        val name = testName
         runCatching {
             log(name, "window", shell("dumpsys window").lines().filter { line ->
                 listOf("mCurrentFocus", "mFocusedApp", "mFocusedWindow", "mTopFullscreenOpaqueWindowState").any { it in line }

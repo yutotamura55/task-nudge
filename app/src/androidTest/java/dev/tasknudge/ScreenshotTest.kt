@@ -41,7 +41,7 @@ class ScreenshotTest {
     }
 
     @Test fun titleOnlyAddDetailAndManualCompletionWorkInActivity() {
-        ActivityScenario.launch(MainActivity::class.java).use {
+        launchMain {
             clickAddFab()
             compose.onNodeWithText("タイトル").performTextInput("首のストレッチ")
             saveVisibleEditor()
@@ -55,10 +55,11 @@ class ScreenshotTest {
     }
 
     @Test fun rotationKeepsDraftAndLargeFontKeepsActionsReachable() {
-        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+        launchMain { scenario ->
             try {
                 clickAddFab()
                 compose.onNodeWithText("タイトル").performTextInput("回転しても残る下書き")
+                compose.closeKeyboard()
                 scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
                 compose.waitUntil(10_000) { var landscape = false; scenario.onActivity { landscape = it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }; landscape }
                 compose.onNodeWithText("回転しても残る下書き").assertExists()
@@ -71,7 +72,7 @@ class ScreenshotTest {
         // Apply a system font scale and recreate a real Activity, then restore it.
         shell("settings put system font_scale 1.8")
         try {
-            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            launchMain { scenario ->
                 scenario.recreate()
                 compose.waitUntil(10_000) {
                     var enlarged = false
@@ -88,7 +89,7 @@ class ScreenshotTest {
 
     @Test fun deniedNotificationPermissionStillAllowsManualTracking() {
         app.resetFixture(notificationsEnabled = false)
-        ActivityScenario.launch(MainActivity::class.java).use {
+        launchMain {
             scrollToVisibleText("通知が無効です")
             clickAddFab()
             compose.onNodeWithText("タイトル").performTextInput("通知なしでも記録")
@@ -104,7 +105,7 @@ class ScreenshotTest {
         app.container.repository.saveTask(null, "水を飲む", 1)
         app.container.repository.completeTask(taskId)
         assertEquals(2, app.container.repository.snapshots.first().tasks.size)
-        ActivityScenario.launch(MainActivity::class.java).use {
+        launchMain {
             waitForAddFabVisible()
             compose.onNode(hasScrollAction()).performScrollToNode(hasText("首のストレッチ"))
             compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
@@ -122,7 +123,7 @@ class ScreenshotTest {
     }
 
     @Test fun fifteenMinuteIntervalPersistsAndRemainsSelectedAfterReopening() {
-        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+        launchMain { scenario ->
             waitForAddFabVisible()
             compose.onNodeWithContentDescription("通知設定").performClick()
             compose.onNodeWithText("15分").performScrollTo().assertIsDisplayed().performClick()
@@ -141,7 +142,7 @@ class ScreenshotTest {
     }
 
     @Test fun fiveAndTenMinuteIntervalsPersistAndRemainSelectedAfterReopening() {
-        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+        launchMain { scenario ->
             waitForAddFabVisible()
             for (minutes in listOf(5, 10)) {
                 compose.onNodeWithContentDescription("通知設定").performClick()
@@ -184,6 +185,10 @@ class ScreenshotTest {
             compose.waitUntil(10_000) { compose.onAllNodesWithText("タスクの詳細").fetchSemanticsNodes().isNotEmpty() }
             scrollToVisibleText("実行履歴（0回）")
             assertEquals(taskId, notification.notification.extras.getLong("taskId"))
+        } catch (e: Throwable) {
+            // The cleanup below closes the screen and the shade before the rule could log them.
+            diagnostics.captureNow()
+            throw e
         } finally {
             activity?.runOnUiThread { activity?.finish() }
             instrumentation.removeMonitor(monitor)
@@ -234,6 +239,7 @@ class ScreenshotTest {
     }
 
     private fun saveVisibleEditor() {
+        compose.closeKeyboard()
         compose.onNodeWithText("保存").performScrollTo().assertIsDisplayed().performClick()
         // Save commits asynchronously; the app navigates to the detail screen only once
         // the committed TaskSaved result is observed in a snapshot. Wait for that
@@ -249,6 +255,12 @@ class ScreenshotTest {
         compose.waitUntil(10_000) { compose.onAllNodesWithContentDescription("タスクを追加").fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithContentDescription("タスクを追加").assertIsDisplayed()
     }
+
+    // use {} closes the Activity before the diagnostics rule sees a failure, so capture the screen first.
+    private inline fun launchMain(block: (ActivityScenario<MainActivity>) -> Unit) =
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            try { block(scenario) } catch (e: Throwable) { diagnostics.captureNow(); throw e }
+        }
 
     private fun scrollToVisibleText(value: String) {
         compose.waitUntil(10_000) { compose.onAllNodes(hasScrollAction()).fetchSemanticsNodes().isNotEmpty() }
