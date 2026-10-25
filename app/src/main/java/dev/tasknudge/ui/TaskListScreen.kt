@@ -30,7 +30,8 @@ data class TaskListContent(
     val query: String,
     val notificationsEnabled: Boolean,
     val permissionRequested: Boolean,
-    val saving: Boolean,
+    /** False while a command runs or after a screen's command has committed. */
+    val canSubmit: Boolean,
     val now: Instant,
     val zone: ZoneId,
 )
@@ -90,40 +91,46 @@ fun TaskListScreen(content: TaskListContent, actions: TaskListActions) {
             }, style = MaterialTheme.typography.bodyLarge)
         }
         items(visible, key = { it.id }) { task ->
-            val largeText = LocalDensity.current.fontScale >= 1.5f
-            val canComplete = taskCanComplete(task, content.now, content.zone)
-            val details: @Composable (Modifier) -> Unit = { modifier ->
-                Column(modifier) {
-                    Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = if (largeText) 3 else 2, overflow = TextOverflow.Ellipsis)
-                    Text(taskStatus(task, content.now, content.zone), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
-                    Text("完了 ${task.completions.size}回", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-            val completeAction: @Composable () -> Unit = {
-                if (!task.archived) {
-                    TextButton(onClick = { actions.onComplete(task.id) }, enabled = !content.saving && canComplete) {
-                        Text(completeActionLabel(task, canComplete))
-                    }
-                }
-            }
-            Card(onClick = { actions.onOpenTask(task.id) }, modifier = Modifier.fillMaxWidth()) {
-                if (largeText) {
-                    Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)) {
-                        details(Modifier.fillMaxWidth())
-                        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { completeAction() }
-                    }
-                } else {
-                    Row(
-                        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        details(Modifier.weight(1f))
-                        completeAction()
-                    }
-                }
-            }
+            TaskRow(task, content.canSubmit, content.now, content.zone, onOpen = { actions.onOpenTask(task.id) }, onComplete = { actions.onComplete(task.id) })
         }
         item { Spacer(Modifier.height(80.dp)) }
+    }
+}
+
+/** With large text the complete button moves below the title so the title keeps its width. */
+@Composable
+private fun TaskRow(task: TaskSnapshot, canSubmit: Boolean, now: Instant, zone: ZoneId, onOpen: () -> Unit, onComplete: () -> Unit) {
+    val largeText = LocalDensity.current.fontScale >= 1.5f
+    val canComplete = taskCanComplete(task, now, zone)
+    val details: @Composable (Modifier) -> Unit = { modifier ->
+        Column(modifier) {
+            Text(task.title, style = MaterialTheme.typography.titleMedium, maxLines = if (largeText) 3 else 2, overflow = TextOverflow.Ellipsis)
+            Text(taskStatus(task, now, zone), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+            Text("完了 ${task.completions.size}回", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+    val completeAction: @Composable () -> Unit = {
+        if (!task.archived) {
+            TextButton(onClick = onComplete, enabled = canSubmit && canComplete) {
+                Text(completeActionLabel(task, canComplete))
+            }
+        }
+    }
+    Card(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+        if (largeText) {
+            Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp)) {
+                details(Modifier.fillMaxWidth())
+                Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { completeAction() }
+            }
+        } else {
+            Row(
+                Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                details(Modifier.weight(1f))
+                completeAction()
+            }
+        }
     }
 }
 
@@ -146,7 +153,7 @@ private fun TaskListPreview() {
     TaskNudgeTheme(dynamicColor = false) {
         Surface { TaskListScreen(
             TaskListContent(tasks = emptyList(), showArchived = false, query = "", notificationsEnabled = false,
-                permissionRequested = false, saving = false, now = Instant.now(), zone = ZoneId.systemDefault()),
+                permissionRequested = false, canSubmit = true, now = Instant.now(), zone = ZoneId.systemDefault()),
             TaskListActions(onShowArchived = {}, onQueryChange = {}, onEnableNotifications = {}, onOpenTask = {}, onComplete = {}),
         ) }
     }

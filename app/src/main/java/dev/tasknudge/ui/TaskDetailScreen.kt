@@ -18,7 +18,7 @@ class TaskDetailActions(
 )
 
 @Composable
-fun TaskDetailScreen(task: TaskSnapshot, saving: Boolean, now: Instant, zone: ZoneId, actions: TaskDetailActions) {
+fun TaskDetailScreen(task: TaskSnapshot, canSubmit: Boolean, now: Instant, zone: ZoneId, actions: TaskDetailActions) {
     val canComplete = taskCanComplete(task, now, zone)
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item {
@@ -28,9 +28,9 @@ fun TaskDetailScreen(task: TaskSnapshot, saving: Boolean, now: Instant, zone: Zo
         }
         item {
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (!task.archived) Button(onClick = actions.onComplete, enabled = !saving && canComplete, modifier = Modifier.fillMaxWidth()) { Text(completeActionLabel(task, canComplete)) }
+                if (!task.archived) Button(onClick = actions.onComplete, enabled = canSubmit && canComplete, modifier = Modifier.fillMaxWidth()) { Text(completeActionLabel(task, canComplete)) }
                 OutlinedButton(onClick = actions.onEdit, modifier = Modifier.fillMaxWidth()) { Text("編集") }
-                TextButton(onClick = { actions.onArchive(!task.archived) }, enabled = !saving, modifier = Modifier.fillMaxWidth()) { Text(if (task.archived) "再開する" else "停止する") }
+                TextButton(onClick = { actions.onArchive(!task.archived) }, enabled = canSubmit, modifier = Modifier.fillMaxWidth()) { Text(if (task.archived) "再開する" else "停止する") }
                 Text("停止しても実行履歴は残ります。", style = MaterialTheme.typography.bodySmall)
             }
         }
