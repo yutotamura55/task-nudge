@@ -25,7 +25,8 @@ import org.junit.Rule
 import org.junit.Test
 
 class ScreenshotTest {
-    @get:Rule val compose = createEmptyComposeRule()
+    @get:Rule(order = 0) val compose = createEmptyComposeRule()
+    @get:Rule(order = 1) val diagnostics = FailureDiagnostics()
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val app get() = instrumentation.targetContext.applicationContext as DeviceTestApplication
 

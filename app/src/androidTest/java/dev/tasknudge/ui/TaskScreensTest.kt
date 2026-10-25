@@ -30,6 +30,7 @@ import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.core.TaskInput
 import dev.tasknudge.data.*
 import dev.tasknudge.DeviceTestApplication
+import dev.tasknudge.FailureDiagnostics
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CompletableDeferred
@@ -45,7 +46,8 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 
 class TaskScreensTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule(order = 0) val compose = createComposeRule()
+    @get:Rule(order = 1) val diagnostics = FailureDiagnostics()
     private fun launch(repo: ScreenRepository, enabled: Boolean = true, initial: Long? = null, enable: () -> Unit = {}) {
         compose.setContent { TaskNudgeTheme(dynamicColor = false) { TaskNudgeApp(repo, enabled, enable, initial) } }
     }
