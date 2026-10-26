@@ -83,7 +83,16 @@ Android 8.0（API 26）以上の**専用テスト端末またはエミュレー�
 
 手動で APK を入れる場合、既存アプリと同じ署名なら `adb install -r app/build/outputs/apk/debug/app-debug.apk` で上書きできます。CI の debug 署名は実行間で固定管理されず、別 run の APK は上書きできる保証がありません。署名が違ってアンインストールすると記録は消えます。テスト APK は `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk` です。個別の原因調査では、両 APK を入れた後に `adb shell am instrument -w dev.tasknudge.test/dev.tasknudge.DeviceTestRunner` を実行できます。`adb logcat` で `ReminderEngine` と `TaskNudge` の記録を確認します。テストは専用のインメモリ Room DB を使い、テスト中の実通知を最後に消します。
 
-GitHub Actions は pull request と main への push で起動し、ホスト検証と API 35 Google APIs x86_64 エミュレーターの端末テストを別 runner で並行実行します。PR 作成前の検証にはローカルの `scripts/check.sh` を使います。アップロードに成功した run では、`task-nudge-debug` に APK、`host-test-results` に JVM/lint/detekt、`android-test-results` に instrumentation 結果と実画面画像が3日間保存されます。アップロード失敗はジョブを失敗にしないため、必要な成果物は run の **Artifacts** 一覧で存在を確認してください。ローカルで `/dev/kvm` が使えない場合は、CI の emulator job の成功を確認するまで端末検証を完了と扱いません。
+GitHub Actions は pull request（作成、push、再オープン、「Ready for review」への変更）、main への push、手動実行（Actions の「Android」→「Run workflow」）で起動します。
+ホスト検証（`verify`）は毎回動きます。
+API 35 Google APIs x86_64 エミュレーターの端末テスト（`android-device-tests`）は、変更したファイルを調べる短いジョブ（`changes`）の後に、`verify` とは別の runner で動きます。次の2つの場合は省きます（Issue #49）。変更したファイルを調べられなかった場合は、省かずに動かします。
+
+- 下書き（Draft）の PR（作成、push、再オープンのとき）。「Ready for review」にしたときに1回動き、その後の push でも毎回動きます。
+- 変更したファイルがすべて文書（`*.md` か `docs/` の下）の場合。`LICENSE` などそれ以外のファイルを含めば動きます。
+
+省いたジョブは、GitHub の画面では「skipped」と表示され、チェックとしては成功として扱われます。
+下書きの PR で端末テストを動かしたいときは、手動実行でブランチを選びます。手動実行はブランチの先頭をそのまま試すもので、main との統合は試しません。PR の画面の `android-device-tests` も「skipped」のまま変わりません。
+PR 作成前の検証にはローカルの `scripts/check.sh` を使います。アップロードに成功した run では、`task-nudge-debug` に APK、`host-test-results` に JVM/lint/detekt、`android-test-results` に instrumentation 結果と実画面画像が3日間保存されます。アップロード失敗はジョブを失敗にしないため、必要な成果物は run の **Artifacts** 一覧で存在を確認してください。ローカルで `/dev/kvm` が使えない場合は、CI の emulator job の成功を確認するまで端末検証を完了と扱いません。
 
 README の3画像は [成功したCI 36952478562](https://github.com/yutotamura55/task-nudge/actions/runs/36952478562) のAPI35実画面です。最終source `c1b5dd5` の [PR CI 36963062421](https://github.com/yutotamura55/task-nudge/actions/runs/36963062421) と [push CI 36963059186](https://github.com/yutotamura55/task-nudge/actions/runs/36963059186) は単体101件・端末24件がすべて成功。両runの画像も掲載画像とSHA-256一致を確認しました。現在のchecksは [PR #2](https://github.com/yutotamura55/task-nudge/pull/2) を参照してください。
 
