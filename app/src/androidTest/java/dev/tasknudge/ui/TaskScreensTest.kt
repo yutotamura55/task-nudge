@@ -77,10 +77,27 @@ class TaskScreensTest {
         assertTrue("The emulator must show a keyboard area for a focused field", shown || !isEmulator())
         assumeTrue("This device showed no soft keyboard", shown)
     }
-    private fun assertAboveKeyboard(node: SemanticsNodeInteraction, name: String) {
-        val bounds = node.fetchSemanticsNode().boundsInWindow
+    // Unclipped bottom edge: boundsInWindow is clipped by the scroll viewport, so a partly
+    // hidden node would still look inside it.
+    private fun bottomInWindow(node: SemanticsNodeInteraction): Float {
+        val semantics = node.fetchSemanticsNode()
+        return semantics.positionInWindow.y + semantics.size.height
+    }
+    /**
+     * The check proves something only when the keyboard would cover the node if the screen
+     * did not avoid it. Required on the emulator (CI's 320x640 screen); skipped on taller screens.
+     */
+    private fun requireCoveredWithoutAvoidance(bottomWithoutKeyboard: Float, name: String) {
         val top = requireNotNull(keyboardTopInWindow()) { "The keyboard area closed before checking $name" }
-        assertTrue("$name must show above the keyboard: bounds=$bounds keyboardTop=$top", bounds.height > 0f && bounds.bottom <= top + 1f)
+        val covered = bottomWithoutKeyboard > top
+        assertTrue("On the emulator the keyboard must cover $name without avoidance: bottom=$bottomWithoutKeyboard keyboardTop=$top", covered || !isEmulator())
+        assumeTrue("The keyboard does not reach $name on this screen", covered)
+    }
+    private fun assertAboveKeyboard(node: SemanticsNodeInteraction, name: String) {
+        val semantics = node.fetchSemanticsNode()
+        val bottom = bottomInWindow(node)
+        val top = requireNotNull(keyboardTopInWindow()) { "The keyboard area closed before checking $name" }
+        assertTrue("$name must show above the keyboard: top=${semantics.positionInWindow.y} bottom=$bottom keyboardTop=$top", semantics.size.height > 0 && bottom <= top + 1f)
     }
     private fun tapSave(label: String = "保存") {
         dismissKeyboard()
@@ -296,8 +313,10 @@ class TaskScreensTest {
     @Test fun editorKeepsTitleAndSaveAboveTheKeyboard() {
         val repo = ScreenRepository(); launchEdgeToEdge(repo)
         compose.onNodeWithContentDescription("タスクを追加").performClick()
+        val saveBottomWithoutKeyboard = bottomInWindow(compose.onNodeWithText("保存"))
         compose.onNodeWithText("タイトル").performClick()
         requireKeyboard()
+        requireCoveredWithoutAvoidance(saveBottomWithoutKeyboard, "保存")
         assertAboveKeyboard(compose.onNodeWithText("タイトル"), "タイトル")
         compose.onNodeWithText("保存").performScrollTo()
         compose.awaitKeyboardAreaSettled()
@@ -307,11 +326,13 @@ class TaskScreensTest {
     @Test fun bulkEditorKeepsInputAndCountAboveTheKeyboard() {
         val repo = ScreenRepository(); launchEdgeToEdge(repo)
         compose.onNodeWithContentDescription("まとめて追加").performClick()
+        val countBottomWithoutKeyboard = bottomInWindow(compose.onNodeWithText("追加予定：0件"))
         compose.runOnIdle {
             val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
             activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput").requestFocus()
         }
         requireKeyboard()
+        requireCoveredWithoutAvoidance(countBottomWithoutKeyboard, "追加予定")
         // A View inside Compose reports no Compose clipping, so check that its first line,
         // where typing starts, is above the keyboard area.
         var firstLineBottom = 0
