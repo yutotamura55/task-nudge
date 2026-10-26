@@ -32,6 +32,10 @@ import dev.tasknudge.DeviceTestApplication
 import dev.tasknudge.FailureDiagnostics
 import dev.tasknudge.awaitKeyboardAreaSettled
 import dev.tasknudge.closeKeyboard
+import dev.tasknudge.keyboardTopInWindow
+import dev.tasknudge.showKeyboard
+import androidx.activity.ComponentActivity
+import androidx.activity.enableEdgeToEdge
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CompletableDeferred
@@ -60,6 +64,24 @@ class TaskScreensTest {
         compose.onNodeWithText("追加予定：${value.lines().count { it.isNotBlank() }}件").assertExists()
     }
     private fun dismissKeyboard() = compose.closeKeyboard()
+    private fun launchEdgeToEdge(repo: ScreenRepository) {
+        compose.runOnUiThread {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            (activity as ComponentActivity).enableEdgeToEdge()
+        }
+        launch(repo)
+    }
+    /** Shows the keyboard for the focused field; requires one on the emulator, skips elsewhere. */
+    private fun requireKeyboard() {
+        val shown = compose.showKeyboard()
+        assertTrue("The emulator must show a keyboard area for a focused field", shown || !isEmulator())
+        assumeTrue("This device showed no soft keyboard", shown)
+    }
+    private fun assertAboveKeyboard(node: SemanticsNodeInteraction, name: String) {
+        val bounds = node.fetchSemanticsNode().boundsInWindow
+        val top = requireNotNull(keyboardTopInWindow()) { "The keyboard area closed before checking $name" }
+        assertTrue("$name must show above the keyboard: bounds=$bounds keyboardTop=$top", bounds.height > 0f && bounds.bottom <= top + 1f)
+    }
     private fun tapSave(label: String = "保存") {
         dismissKeyboard()
         compose.onNodeWithText(label).performScrollTo().assertIsDisplayed().performClick()
@@ -224,7 +246,7 @@ class TaskScreensTest {
         assertEquals(listOf(longTitle, "腕"), repo.data.value.tasks.map { it.title })
     }
     @Test fun pastedNewlinesRemainSeparateTasks() {
-        assumeTrue("Clipboard paste is verified on the isolated CI emulator", Build.FINGERPRINT.contains("generic") || Build.MODEL.contains("sdk_gphone"))
+        assumeTrue("Clipboard paste is verified on the isolated CI emulator", isEmulator())
         val repo = ScreenRepository(); launch(repo)
         compose.onNodeWithContentDescription("まとめて追加").performClick()
         val clipboard = InstrumentationRegistry.getInstrumentation().targetContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -267,6 +289,44 @@ class TaskScreensTest {
             val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
             assertTrue("Vertical swipe must scroll the multiline editor: height=${editor.height}, layoutHeight=${editor.layout.height}, scrollY=${editor.scrollY}, bounds=$bounds", editor.scrollY > 0)
         }
+    }
+    // The screen pads itself by the keyboard area (imePadding). With the keyboard shown,
+    // the action below the field must, after scrolling, sit above that area. The test
+    // window is made edge-to-edge like MainActivity so the app, not the window, avoids it.
+    @Test fun editorKeepsTitleAndSaveAboveTheKeyboard() {
+        val repo = ScreenRepository(); launchEdgeToEdge(repo)
+        compose.onNodeWithContentDescription("タスクを追加").performClick()
+        compose.onNodeWithText("タイトル").performClick()
+        requireKeyboard()
+        assertAboveKeyboard(compose.onNodeWithText("タイトル"), "タイトル")
+        compose.onNodeWithText("保存").performScrollTo()
+        compose.awaitKeyboardAreaSettled()
+        assertAboveKeyboard(compose.onNodeWithText("保存"), "保存")
+        dismissKeyboard()
+    }
+    @Test fun bulkEditorKeepsInputAndCountAboveTheKeyboard() {
+        val repo = ScreenRepository(); launchEdgeToEdge(repo)
+        compose.onNodeWithContentDescription("まとめて追加").performClick()
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput").requestFocus()
+        }
+        requireKeyboard()
+        // A View inside Compose reports no Compose clipping, so check that its first line,
+        // where typing starts, is above the keyboard area.
+        var firstLineBottom = 0
+        compose.runOnIdle {
+            val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
+            val editor = activity.window.decorView.findViewWithTag<EditText>("bulkTaskInput")
+            val location = IntArray(2).also { editor.getLocationInWindow(it) }
+            firstLineBottom = location[1] + editor.totalPaddingTop + editor.lineHeight
+        }
+        val top = requireNotNull(keyboardTopInWindow()) { "The keyboard area closed before the check" }
+        assertTrue("The first line of the bulk input must show above the keyboard: bottom=$firstLineBottom keyboardTop=$top", firstLineBottom <= top)
+        compose.onNodeWithText("追加予定：0件").performScrollTo()
+        compose.awaitKeyboardAreaSettled()
+        assertAboveKeyboard(compose.onNodeWithText("追加予定：0件"), "追加予定")
+        dismissKeyboard()
     }
     @Test fun japaneseCompositionRemainsActiveAcrossScreenRecomposition() {
         val repo = ScreenRepository(); launch(repo)
@@ -664,3 +724,5 @@ private class ScreenRepository(tasks: List<TaskSnapshot> = emptyList(), private 
     override suspend fun saveSettings(settings: ReminderSettings) { data.value = data.value.copy(settings = settings) }
     override suspend fun recordPermissionRequest() { data.value = data.value.copy(permissionRequested = true) }
 }
+
+private fun isEmulator() = Build.FINGERPRINT.contains("generic") || Build.MODEL.contains("sdk_gphone")
