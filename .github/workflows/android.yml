@@ -2,17 +2,56 @@ name: Android
 
 on:
   pull_request:
+    # ready_for_review runs the emulator tests once when a draft PR is marked ready.
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: android-${{ github.workflow }}-${{ github.ref }}
+  # The event name keeps a manual run and a merge push on main from cancelling each other.
+  group: android-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  # Decides whether the change touches anything besides documents (*.md, docs/**).
+  changes:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          # File names only: full history without file contents.
+          fetch-depth: 0
+          filter: blob:none
+      - id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          case "$EVENT" in
+            # The checkout is the PR merged into main; its first parent is that main.
+            pull_request) range="HEAD^1..HEAD" ;;
+            push) range="$PUSH_BEFORE..$GITHUB_SHA" ;;
+            *) range="" ;;
+          esac
+          # Manual runs, new branches and unreadable ranges count as code changes.
+          if [[ -z "$range" || "$PUSH_BEFORE" =~ ^0+$ ]] || ! files="$(git diff --name-only "$range")"; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "$files"
+          if grep -q -v -E '(\.md$|^docs/)' <<< "$files"; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+
   verify:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -53,7 +92,15 @@ jobs:
           if-no-files-found: warn
           retention-days: 3
 
+  # Skipped for draft PRs and document-only changes. A job skipped by `if` reports
+  # success, so it does not leave a required check pending. If `changes` fails, run
+  # anyway rather than skip on an unknown change.
   android-device-tests:
+    needs: changes
+    if: >-
+      ${{ !cancelled()
+      && (needs.changes.result != 'success' || needs.changes.outputs.code == 'true')
+      && (github.event_name != 'pull_request' || !github.event.pull_request.draft) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     steps:
