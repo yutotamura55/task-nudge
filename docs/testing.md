@@ -87,7 +87,7 @@ GitHub Actions は pull request（作成、push、再オープン、「Ready for
 ホスト検証（`verify`）は毎回動きます。
 API 35 Google APIs x86_64 エミュレーターの端末テスト（`android-device-tests`）は、変更したファイルを調べる短いジョブ（`changes`）の後に、`verify` とは別の runner で動きます。次の2つの場合は省きます（Issue #49）。変更したファイルを調べられなかった場合は、省かずに動かします。
 
-- 下書き（Draft）の PR への push。「Ready for review」にしたときに1回動き、その後の push でも毎回動きます。
+- 下書き（Draft）の PR（作成、push、再オープンのとき）。「Ready for review」にしたときに1回動き、その後の push でも毎回動きます。
 - 変更したファイルがすべて文書（`*.md` か `docs/` の下）の場合。`LICENSE` などそれ以外のファイルを含めば動きます。
 
 省いたジョブは、GitHub の画面では「skipped」と表示され、チェックとしては成功として扱われます。
