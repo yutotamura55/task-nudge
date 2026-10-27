@@ -2,6 +2,9 @@ package dev.tasknudge.core
 
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.temporal.ChronoUnit
+import kotlin.math.abs
 
 /** Everything a backup file carries. Task IDs are renumbered on import; device state is not included. */
 data class Backup(val settings: ReminderSettings, val tasks: List<BackupTask>)
@@ -51,9 +54,24 @@ fun validateBackup(backup: Backup): Backup {
         val hoursValid = task.recurrenceHours == null || recurrenceError(task.recurrenceHours, hourly = true) == null
         check(hoursValid, BackupProblem.RECURRENCE, number)
         val instants = listOfNotNull(task.createdAt, task.snoozedUntil) + task.completions.map { it.completedAt }
-        check(instants.all { it in backupInstantRange }, BackupProblem.DATE_TIME, number)
+        check(instants.all(::isStorableInstant), BackupProblem.DATE_TIME, number)
+        check(task.completions.all(::hasPlausibleDate), BackupProblem.DATE_TIME, number)
         // The database keeps one record per task, date and time.
         check(task.completions.distinct().size == task.completions.size, BackupProblem.DUPLICATE_COMPLETION, number)
     }
     return backup
 }
+
+/** The database keeps milliseconds; finer values would merge into duplicates when stored. */
+private fun isStorableInstant(instant: Instant) = instant in backupInstantRange && instant.nano % NANOS_PER_MILLI == 0
+
+/**
+ * The app records the device's date at completion. Time zones differ from UTC by
+ * less than a day, so any other date would be invented and could stop the task's reminders.
+ */
+private fun hasPlausibleDate(completion: BackupCompletion): Boolean {
+    val utcDate = completion.completedAt.atOffset(ZoneOffset.UTC).toLocalDate()
+    return abs(ChronoUnit.DAYS.between(utcDate, completion.localDate)) <= 1
+}
+
+private const val NANOS_PER_MILLI = 1_000_000

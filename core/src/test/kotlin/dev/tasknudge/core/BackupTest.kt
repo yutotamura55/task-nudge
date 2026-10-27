@@ -10,6 +10,7 @@ class BackupTest {
     private val completion = BackupCompletion(Instant.parse("2026-10-01T01:00:00Z"), LocalDate.of(2026, 10, 1))
     private val task = BackupTask("首", 1, null, Instant.parse("2026-09-30T00:00:00Z"), false, null, listOf(completion))
     private val backup = Backup(ReminderSettings(), listOf(task))
+    private fun completedOn(date: LocalDate) = task.copy(completions = listOf(completion.copy(localDate = date)))
 
     @Test fun acceptsWhatTheScreensAccept() {
         assertSame(backup, validateBackup(backup))
@@ -32,6 +33,10 @@ class BackupTest {
             second(task.copy(completions = listOf(completion.copy(completedAt = Instant.MIN))))
                 to BackupProblem.DATE_TIME,
             second(task.copy(completions = listOf(completion, completion))) to BackupProblem.DUPLICATE_COMPLETION,
+            second(task.copy(createdAt = Instant.parse("2026-09-30T00:00:00.000100Z"))) to BackupProblem.DATE_TIME,
+            second(completedOn(LocalDate.MAX)) to BackupProblem.DATE_TIME,
+            second(completedOn(LocalDate.of(2026, 10, 3))) to BackupProblem.DATE_TIME,
+            second(completedOn(LocalDate.of(2026, 9, 29))) to BackupProblem.DATE_TIME,
         )) {
             val error = runCatching { validateBackup(invalid) }.exceptionOrNull() as InvalidBackupException
             assertEquals(problem, error.problem)
@@ -49,6 +54,13 @@ class BackupTest {
             assertEquals(problem, error.problem)
             assertEquals(null, error.taskNumber)
         }
+    }
+
+    @Test fun completionDatesMayDifferFromUtcByTheTimeZone() {
+        // One day either way of the UTC date covers every time zone.
+        val sameTime = completion.copy(localDate = LocalDate.of(2026, 9, 30))
+        val nextDay = completion.copy(localDate = LocalDate.of(2026, 10, 2))
+        validateBackup(backup.copy(tasks = listOf(task.copy(completions = listOf(completion, sameTime, nextDay)))))
     }
 
     @Test fun completionsAtTheSameTimeOnDifferentDatesAreDistinct() {

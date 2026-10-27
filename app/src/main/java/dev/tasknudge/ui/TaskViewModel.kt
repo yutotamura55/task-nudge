@@ -124,22 +124,39 @@ class TaskViewModel(
     fun completeTask(id: Long, sessionId: Long = state.value.operation.sessionId) = mutate(sessionId) { repository.completeTask(id); OperationResult.Updated }
     fun setArchived(id: Long, archived: Boolean, sessionId: Long = state.value.operation.sessionId) = mutate(sessionId) { repository.setArchived(id, archived); OperationResult.Updated }
 
-    /** Writes the current data to [document]. A failed write tries to remove the partial file. */
+    /**
+     * Writes the current data to [document]. A write that fails after opening tries to
+     * remove the partial file; a file that could not be opened is left as it was, because
+     * the user may have chosen an existing backup to overwrite.
+     */
     fun exportBackup(document: BackupDocument, sessionId: Long = state.value.operation.sessionId) {
         if (!canSubmit(sessionId)) return
-        launchOperation(sessionId, "書き出せませんでした。保存先を確かめて、もう一度お試しください。") {
-            val backup = repository.exportBackup()
-            withContext(ioDispatcher) {
-                var written = false
-                try {
-                    document.openOutput().use { backupCodec.write(backup, clock.instant(), it) }
-                    written = true
-                } finally {
-                    // Deleting is best effort; the write failure is what the user sees.
-                    if (!written) runCatching { document.delete() }
-                }
+        mutableState.update { it.copy(operation = ScreenOperation(sessionId, OperationState.Saving)) }
+        viewModelScope.launch {
+            val next = try {
+                val backup = repository.exportBackup()
+                withContext(ioDispatcher) { writeBackup(backup, document) }
+                OperationState.Committed(OperationResult.BackupExported(backup.tasks.size))
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (invalid: InvalidBackupException) { OperationState.Failed("書き出しを止めました。${invalid.reason()}") }
+            catch (_: Exception) { OperationState.Failed("書き出せませんでした。保存先を確かめて、もう一度お試しください。") }
+            mutableState.update {
+                if (it.operation.sessionId == sessionId) it.copy(operation = ScreenOperation(sessionId, next)) else it
             }
-            OperationResult.BackupExported(backup.tasks.size)
+        }
+    }
+
+    private fun writeBackup(backup: Backup, document: BackupDocument) {
+        // Checked before opening, because opening truncates a chosen existing file.
+        validateBackup(backup)
+        val output = document.openOutput()
+        var written = false
+        try {
+            output.use { backupCodec.write(backup, clock.instant(), it) }
+            written = true
+        } finally {
+            // Deleting is best effort; the write failure is what the user sees.
+            if (!written) runCatching { document.delete() }
         }
     }
 
@@ -201,9 +218,12 @@ class TaskViewModel(
 
 private fun Backup.preview() = ImportPreview(tasks.size, tasks.sumOf { it.completions.size })
 
-internal fun InvalidBackupException.displayMessage(): String {
+internal fun InvalidBackupException.displayMessage() = "読み込めませんでした。${reason()}データは変わっていません。"
+
+/** What is wrong with the data, without any of its content. */
+internal fun InvalidBackupException.reason(): String {
     val where = taskNumber?.let { "${it}件目のタスクの" } ?: ""
-    val reason = when (problem) {
+    return when (problem) {
         BackupProblem.NOT_A_BACKUP -> "このアプリで書き出したファイルではありません。"
         BackupProblem.NEWER_VERSION -> "新しい版のアプリで書き出したファイルです。アプリを更新してから読み込んでください。"
         BackupProblem.TOO_LARGE -> "ファイルが大きすぎます（上限 ${BackupCodec.MAX_MEGABYTES} MB）。"
@@ -215,7 +235,6 @@ internal fun InvalidBackupException.displayMessage(): String {
         BackupProblem.DATE_TIME -> "${where}日時が正しくありません。"
         BackupProblem.DUPLICATE_COMPLETION -> "${where}完了記録が重複しています。"
     }
-    return "読み込めませんでした。${reason}データは変わっていません。"
 }
 
 internal fun InputError.message(): String = when (this) {

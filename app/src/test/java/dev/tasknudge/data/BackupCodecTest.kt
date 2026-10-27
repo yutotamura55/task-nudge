@@ -58,6 +58,9 @@ class BackupCodecTest {
     @Test fun identifiesFilesThatAreNotBackupsOrAreNewer() {
         assertEquals(BackupProblem.NOT_A_BACKUP, problem("{\"format\": \"other\", \"version\": 1}"))
         assertEquals(BackupProblem.NOT_A_BACKUP, problem("{\"version\": 1, \"format\": \"task-nudge-backup\"}"))
+        for (other in listOf("", "[]", "%PDF-1.7", "neck\narm")) {
+            assertEquals(other, BackupProblem.NOT_A_BACKUP, problem(other))
+        }
         // A newer file may hold fields this version does not know.
         val newer = text().replace("\"version\": 1", "\"version\": 2").replace("\"tasks\"", "\"future\"")
         assertEquals(BackupProblem.NEWER_VERSION, problem(newer))
@@ -67,8 +70,6 @@ class BackupCodecTest {
     @Test fun rejectsAnythingTheWriterWouldNotProduce() {
         val written = text()
         for (invalid in listOf(
-            "",
-            "[]",
             written.dropLast(2),
             "$written {}",
             written.replace("\"archived\": false", "\"archived\": false, \"archived\": true"),
@@ -121,5 +122,8 @@ class BackupCodecTest {
     @Test fun refusesToWriteAFileItCouldNotReadBack() {
         val size = text().toByteArray(Charsets.UTF_8).size
         assertTrue(runCatching { BackupCodec(size - 1L).write(backup, exportedAt, ByteArrayOutputStream()) }.isFailure)
+        val tooMany = backup.copy(tasks = List(MAX_BACKUP_TASKS + 1) { backup.tasks.last() })
+        val error = runCatching { codec.write(tooMany, exportedAt, ByteArrayOutputStream()) }.exceptionOrNull()
+        assertEquals(BackupProblem.TOO_MANY_TASKS, (error as InvalidBackupException).problem)
     }
 }

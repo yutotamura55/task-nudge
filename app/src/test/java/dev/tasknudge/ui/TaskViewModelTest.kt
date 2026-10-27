@@ -87,6 +87,24 @@ class TaskViewModelTest {
         assertTrue(document.deleted)
         assertTrue(vm.state.value.operation.state is OperationState.Failed)
     }
+    @Test fun exportThatCannotOpenTheFileLeavesItAlone() = runTest(dispatcher) {
+        val repo = FakeRepository().apply { backup = sampleBackup }
+        val vm = TaskViewModel(repo, ioDispatcher = dispatcher)
+        val document = MemoryDocument(failOpen = true)
+        vm.exportBackup(document); runCurrent()
+        assertFalse(document.deleted)
+        assertTrue(vm.state.value.operation.state is OperationState.Failed)
+    }
+    @Test fun exportRefusesDataThatCouldNotBeImportedWithoutTouchingTheFile() = runTest(dispatcher) {
+        val tooMany = sampleBackup.copy(tasks = List(MAX_BACKUP_TASKS + 1) { sampleBackup.tasks.single() })
+        val repo = FakeRepository().apply { backup = tooMany }
+        val vm = TaskViewModel(repo, ioDispatcher = dispatcher)
+        val document = MemoryDocument()
+        vm.exportBackup(document); runCurrent()
+        assertEquals(OperationState.Failed("書き出しを止めました。タスクが10000件を超えています。"), vm.state.value.operation.state)
+        assertEquals(0, document.written.size())
+        assertFalse(document.deleted)
+    }
     @Test fun importChangesNothingUntilConfirmed() = runTest(dispatcher) {
         val repo = FakeRepository(); val vm = TaskViewModel(repo, ioDispatcher = dispatcher)
         vm.prepareImport(MemoryDocument(sampleBackup)); runCurrent()
@@ -487,12 +505,16 @@ private class MemoryDocument(
     backup: Backup? = null,
     private val failWrite: Boolean = false,
     private val failRead: Boolean = false,
+    private val failOpen: Boolean = false,
 ) : BackupDocument {
     var content = backup?.let { encode(it) } ?: ""
     val written = ByteArrayOutputStream()
     var deleted = false
-    override fun openOutput(): OutputStream =
-        if (failWrite) object : OutputStream() { override fun write(b: Int) = throw IOException("full") } else written
+    override fun openOutput(): OutputStream = when {
+        failOpen -> throw IOException("unsupported mode")
+        failWrite -> object : OutputStream() { override fun write(b: Int) = throw IOException("full") }
+        else -> written
+    }
     override fun openInput(): InputStream =
         if (failRead) throw IOException("gone") else ByteArrayInputStream(content.toByteArray(Charsets.UTF_8))
     override fun delete() { deleted = true }

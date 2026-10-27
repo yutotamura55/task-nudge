@@ -3,7 +3,9 @@ package dev.tasknudge.data
 import android.util.JsonReader
 import android.util.JsonToken
 import android.util.JsonWriter
+import android.util.MalformedJsonException
 import dev.tasknudge.core.*
+import java.io.EOFException
 import java.io.FilterInputStream
 import java.io.FilterOutputStream
 import java.io.IOException
@@ -23,7 +25,12 @@ import java.time.format.DateTimeParseException
  * not produce, and validates the result before returning it.
  */
 class BackupCodec(private val maxBytes: Long = MAX_BYTES) {
+    /**
+     * Refuses with [InvalidBackupException] data that [read] would refuse, such as too
+     * many tasks, so an export never reports success for a file that cannot be restored.
+     */
     fun write(backup: Backup, exportedAt: Instant, output: OutputStream) {
+        validateBackup(backup)
         val writer = JsonWriter(OutputStreamWriter(LimitedOutputStream(output, maxBytes), Charsets.UTF_8))
         writer.setIndent("  ")
         writer.beginObject()
@@ -71,10 +78,7 @@ class BackupCodec(private val maxBytes: Long = MAX_BYTES) {
     }
 
     private fun StrictJsonReader.readBackup(): Backup {
-        beginObject()
-        // Any other file, JSON or not, ends here instead of as a malformed backup.
-        val format = if (nextName() == FORMAT) runCatching { readString() }.getOrNull() else null
-        if (format != FORMAT_NAME) throw InvalidBackupException(BackupProblem.NOT_A_BACKUP)
+        if (readFormat() != FORMAT_NAME) throw InvalidBackupException(BackupProblem.NOT_A_BACKUP)
         if (nextName() != VERSION) malformed()
         val version = readInt()
         if (version > CURRENT_VERSION) throw InvalidBackupException(BackupProblem.NEWER_VERSION)
@@ -90,6 +94,19 @@ class BackupCodec(private val maxBytes: Long = MAX_BYTES) {
         }
         return Backup(requireNotNull(settings), requireNotNull(tasks))
     }
+
+    /**
+     * Returns null for any other file, JSON or not and including an empty one, so it is not
+     * reported as a malformed backup. Read and encoding failures, including the size limit,
+     * are about the bytes rather than the format and propagate.
+     */
+    private fun StrictJsonReader.readFormat(): String? = runCatching {
+        beginObject()
+        if (nextName() == FORMAT) readString() else null
+    }.onFailure { failure ->
+        val notJson = failure is MalformedJsonException || failure is EOFException
+        if (failure is IOException && !notJson) throw failure
+    }.getOrNull()
 
     private fun StrictJsonReader.readSettings(): ReminderSettings {
         var start = 0

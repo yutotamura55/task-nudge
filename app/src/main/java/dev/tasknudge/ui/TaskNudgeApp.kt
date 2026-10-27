@@ -45,7 +45,7 @@ fun TaskNudgeApp(
     exactAlarmAccessGranted: Boolean = true,
     onEnableExactAlarm: () -> Unit = {},
 ) {
-    val vm = rememberTaskViewModel(repository)
+    val vm = rememberTaskViewModel(repository, clock)
     var route by rememberSaveable(stateSaver = Route.saver) {
         mutableStateOf(if (initialTaskId == null) Route.TaskList else Route.Detail(initialTaskId))
     }
@@ -185,14 +185,14 @@ private fun backupFileName(now: Instant, zone: ZoneId) = "task-nudge-${now.atZon
 // Some providers label JSON as plain text or binary; the content is validated either way.
 private val backupMimeTypes = arrayOf(BackupCodec.MIME_TYPE, "text/plain", "application/octet-stream")
 
-private fun taskViewModelFactory(repository: TaskRepository) = object : ViewModelProvider.Factory {
+private fun taskViewModelFactory(repository: TaskRepository, clock: Clock) = object : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = TaskViewModel(repository) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = TaskViewModel(repository, clock) as T
 }
 
 @Composable
-private fun rememberTaskViewModel(repository: TaskRepository): TaskViewModel =
-    viewModel(factory = remember(repository) { taskViewModelFactory(repository) })
+private fun rememberTaskViewModel(repository: TaskRepository, clock: Clock): TaskViewModel =
+    viewModel(factory = remember(repository, clock) { taskViewModelFactory(repository, clock) })
 
 /** The current time, refreshed every 30 seconds while the app is visible, so statuses such as "今日完了" stay current. */
 @Composable
