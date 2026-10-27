@@ -30,6 +30,14 @@ fun BackupScreen(content: BackupContent, actions: BackupActions) {
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        // Shown first, like errors, because a small screen would push it below the buttons it disables.
+        if (content.operation == OperationState.Saving) Text("処理中…")
+        val message = when (val result = (content.operation as? OperationState.Committed)?.result) {
+            is OperationResult.BackupExported -> "タスク ${result.taskCount} 件を書き出しました。"
+            is OperationResult.BackupImported -> "タスク ${result.taskCount} 件を読み込みました。"
+            else -> null
+        }
+        message?.let { BackupResult(it, actions.onDismissResult) }
         Text("書き出す", style = MaterialTheme.typography.titleLarge)
         Text(
             "タスク・完了履歴・通知の時間と間隔を、1 つのファイル（JSON 形式）に保存します。" +
@@ -44,13 +52,6 @@ fun BackupScreen(content: BackupContent, actions: BackupActions) {
         OutlinedButton(onClick = actions.onImport, enabled = content.canStart, modifier = Modifier.fillMaxWidth()) {
             Text("ファイルから読み込む")
         }
-        if (content.operation == OperationState.Saving) Text("処理中…")
-        val message = when (val result = (content.operation as? OperationState.Committed)?.result) {
-            is OperationResult.BackupExported -> "タスク ${result.taskCount} 件を書き出しました。"
-            is OperationResult.BackupImported -> "タスク ${result.taskCount} 件を読み込みました。"
-            else -> null
-        }
-        message?.let { BackupResult(it, actions.onDismissResult) }
     }
     (content.operation as? OperationState.ConfirmingImport)?.let {
         ConfirmImportDialog(it.preview, content.currentTaskCount, actions)

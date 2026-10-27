@@ -3,6 +3,9 @@ package dev.tasknudge.ui
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -117,6 +120,44 @@ class TaskScreensTest {
         }
         compose.onNodeWithText("アラームとリマインダーを許可").performClick()
         compose.runOnIdle { assertEquals(1, requests) }
+    }
+    @Test fun settingsOpenTheBackupScreenAndBackReturnsToSettings() {
+        launch(ScreenRepository(listOf(sampleTask())))
+        compose.onNodeWithContentDescription("通知設定").performClick()
+        compose.onNodeWithText("データの書き出しと読み込み").performScrollTo().performClick()
+        compose.onNodeWithText("ファイルに書き出す").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithText("ファイルから読み込む").assertIsDisplayed().assertIsEnabled()
+        compose.onNodeWithContentDescription("戻る").performClick()
+        compose.onNodeWithText("通知する時間").assertIsDisplayed()
+    }
+    @Test fun importAsksBeforeReplacingAndShowsTheCounts() {
+        var confirmed = 0
+        var cancelled = 0
+        val confirming = OperationState.ConfirmingImport(ImportPreview(taskCount = 3, completionCount = 12))
+        var operation by mutableStateOf<OperationState>(confirming)
+        compose.setContent {
+            TaskNudgeTheme(dynamicColor = false) {
+                BackupScreen(
+                    BackupContent(operation, currentTaskCount = 5),
+                    BackupActions(
+                        onExport = {}, onImport = {}, onConfirmImport = { confirmed++ },
+                        onCancelImport = { cancelled++ }, onDismissResult = {},
+                    ),
+                )
+            }
+        }
+        compose.onNodeWithText("ファイルにあるタスク 3 件・完了記録 12 件で、今のタスク 5 件", substring = true)
+            .assertIsDisplayed()
+        compose.onNodeWithText("やめる").performClick()
+        compose.onNodeWithText("置き換える").performClick()
+        compose.runOnIdle {
+            assertEquals(1, cancelled)
+            assertEquals(1, confirmed)
+            operation = OperationState.Committed(OperationResult.BackupImported(3))
+        }
+        compose.onNodeWithText("タスク 3 件を読み込みました。").assertIsDisplayed()
+        // A shown result blocks another file until it is closed.
+        compose.onNodeWithText("ファイルから読み込む").assertIsNotEnabled()
     }
     @Test fun fourTasksRemainVisibleWithoutScrollingInACompactList() {
         val tasks = listOf(
