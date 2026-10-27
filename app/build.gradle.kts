@@ -18,6 +18,27 @@ android {
         testInstrumentationRunner = "dev.tasknudge.DeviceTestRunner"
     }
 
+    // Release signing comes only from the environment (CI secrets or a local shell), never
+    // from the repository. Without TASK_NUDGE_KEYSTORE the release build stays unsigned.
+    // Missing passwords fail only when a release is signed, not every build. A relative
+    // keystore path is resolved from the repository root.
+    val releaseKeystore = providers.environmentVariable("TASK_NUDGE_KEYSTORE").orNull
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = rootProject.file(releaseKeystore)
+                storePassword = providers.environmentVariable("TASK_NUDGE_KEYSTORE_PASSWORD").orNull
+                keyAlias = providers.environmentVariable("TASK_NUDGE_KEY_ALIAS").orNull
+                keyPassword = providers.environmentVariable("TASK_NUDGE_KEY_PASSWORD").orNull
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (releaseKeystore != null) signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

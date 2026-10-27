@@ -1,0 +1,119 @@
+name: Release
+
+# Builds the release APK signed with the release key and attaches it to a GitHub Release.
+# A tag push (v0.2.0) publishes; a manual run only builds and keeps the APK as an artifact,
+# to check the secrets before tagging. See docs/release.md.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Holds the signing key but can only read the repository. It runs no Gradle cache action:
+  # setup-gradle adds its own init scripts and restores caches other runs wrote, and both
+  # would run inside the build that sees the key.
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3
+        with:
+          packages: platform-tools build-tools;36.0.0
+      - name: Check the tag
+        if: github.event_name == 'push'
+        run: |
+          # Only reviewed code gets signed: the tagged commit must be on main.
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Tag $GITHUB_REF_NAME points to a commit that is not on main" >&2
+            exit 1
+          fi
+          version_name() { git show "$1:app/build.gradle.kts" | sed -n 's/^ *versionName = "\(.*\)"$/\1/p'; }
+          version_code() { git show "$1:app/build.gradle.kts" | sed -n 's/^ *versionCode = \([0-9][0-9]*\)$/\1/p'; }
+          if [[ "$GITHUB_REF_NAME" != "v$(version_name "$GITHUB_SHA")" ]]; then
+            echo "Tag $GITHUB_REF_NAME does not match versionName $(version_name "$GITHUB_SHA") in app/build.gradle.kts" >&2
+            exit 1
+          fi
+          # A device updates only to a higher versionCode, so require one above the last release.
+          previous="$(git tag --list 'v*' --sort=-v:refname | grep -v -x "$GITHUB_REF_NAME" | head -n 1)"
+          if [[ -n "$previous" && "$(version_code "$GITHUB_SHA")" -le "$(version_code "$previous")" ]]; then
+            echo "versionCode $(version_code "$GITHUB_SHA") must be greater than $(version_code "$previous") in $previous" >&2
+            exit 1
+          fi
+      - name: Restore the release key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.TASK_NUDGE_KEYSTORE_BASE64 }}
+        run: |
+          if [[ -z "$KEYSTORE_BASE64" ]]; then
+            echo "Secret TASK_NUDGE_KEYSTORE_BASE64 is not set; see docs/release.md" >&2
+            exit 1
+          fi
+          base64 -d <<< "$KEYSTORE_BASE64" > "$RUNNER_TEMP/release.jks"
+      - name: Build the signed release APK
+        env:
+          TASK_NUDGE_KEYSTORE_PASSWORD: ${{ secrets.TASK_NUDGE_KEYSTORE_PASSWORD }}
+          TASK_NUDGE_KEY_ALIAS: ${{ secrets.TASK_NUDGE_KEY_ALIAS }}
+          TASK_NUDGE_KEY_PASSWORD: ${{ secrets.TASK_NUDGE_KEY_PASSWORD }}
+        run: |
+          if [[ -z "$TASK_NUDGE_KEYSTORE_PASSWORD" || -z "$TASK_NUDGE_KEY_ALIAS" || -z "$TASK_NUDGE_KEY_PASSWORD" ]]; then
+            echo "Release signing secrets are not set; see docs/release.md" >&2
+            exit 1
+          fi
+          TASK_NUDGE_KEYSTORE="$RUNNER_TEMP/release.jks" ./gradlew --no-daemon :app:assembleRelease
+      - name: Remove the release key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
+      - name: Check the APK is signed with the release key
+        env:
+          EXPECTED_CERT_SHA256: ${{ vars.TASK_NUDGE_RELEASE_CERT_SHA256 }}
+        run: |
+          apk=app/build/outputs/apk/release/app-release.apk
+          actual="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          if [[ -z "$EXPECTED_CERT_SHA256" || "$actual" != "$EXPECTED_CERT_SHA256" ]]; then
+            echo "Release certificate SHA-256 is '$actual'; expected '$EXPECTED_CERT_SHA256' (repository variable TASK_NUDGE_RELEASE_CERT_SHA256)" >&2
+            exit 1
+          fi
+          name="task-nudge-${GITHUB_REF_NAME}.apk"
+          [[ "$GITHUB_EVENT_NAME" == push ]] || name="task-nudge-${GITHUB_SHA::7}.apk"
+          mkdir -p dist
+          cp "$apk" "dist/$name"
+          (cd dist && sha256sum "$name" > "$name.sha256")
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: task-nudge-release
+          path: dist/
+          retention-days: 3
+
+  # Can write releases but never sees the key or runs the build.
+  publish:
+    needs: build
+    if: github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: task-nudge-release
+          path: dist
+      - name: Publish the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # On a re-run the release may already exist; replace its files instead of failing.
+          if gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber -R "$GITHUB_REPOSITORY"
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes -R "$GITHUB_REPOSITORY"
+          fi
