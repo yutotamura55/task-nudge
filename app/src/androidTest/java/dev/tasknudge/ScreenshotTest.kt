@@ -267,16 +267,19 @@ class ScreenshotTest {
 
     /**
      * Waits after tapping 完了 until the database holds [count] completions and the history
-     * shows them. Both steps are asynchronous and Compose idling tracks neither: the write
-     * runs off the main thread, and the screen updates only when Room re-reads the data.
+     * shows them. Compose waits for recomposition once new state arrives, but not for the
+     * database write or for Room to deliver the re-read data, so a fixed check right after
+     * the tap can come too early. (#53: suspected, not reproduced.)
      */
     private fun waitForCompletionShown(count: Int) {
-        var stored = -1
+        var stored: Int? = null
         try {
-            compose.waitUntil(10_000) { stored = storedCompletions(); stored == count }
+            compose.waitUntil(10_000) { storedCompletions()?.also { stored = it } == count }
         } catch (e: ComposeTimeoutException) {
-            throw AssertionError("Tapping 完了 should store $count completion(s); the database has $stored", e)
+            throw AssertionError("Tapping 完了 should store $count completion(s); last count read: ${stored ?: "none (reads timed out)"}", e)
         }
+        // The history header is a separate list item; bring it into the list before waiting.
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("実行履歴（", substring = true))
         val history = "実行履歴（${count}回）"
         try {
             compose.waitUntil(10_000) { compose.onAllNodesWithText(history).fetchSemanticsNodes().isNotEmpty() }
@@ -285,9 +288,9 @@ class ScreenshotTest {
         }
     }
 
-    // Counts across all tasks with a time limit, so the count itself cannot hide a failure.
-    private fun storedCompletions(): Int = runBlocking {
-        withTimeoutOrNull(2_000) { app.container.repository.snapshots.first().tasks.sumOf { it.completions.size } } ?: -1
+    // Counts across all tasks, giving up after 2 s so a stuck read cannot hang the test.
+    private fun storedCompletions(): Int? = runBlocking {
+        withTimeoutOrNull(2_000) { app.container.repository.snapshots.first().tasks.sumOf { it.completions.size } }
     }
 
     private fun scrollToVisibleText(value: String) {
