@@ -21,6 +21,7 @@ import dev.tasknudge.reminders.AndroidNotificationGateway
 import java.io.File
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -50,6 +51,7 @@ class ScreenshotTest {
             saveVisibleEditor()
             scrollToVisibleText("実行履歴（0回）")
             compose.onNode(hasText("完了") and hasClickAction()).performScrollTo().assertIsDisplayed().performClick()
+            waitForCompletionShown(1)
             scrollToVisibleText("実行履歴（1回）")
             compose.onNode(hasScrollAction()).performScrollToNode(hasText("今日完了済み"))
             compose.onNodeWithText("今日完了済み").assertIsNotEnabled()
@@ -99,6 +101,7 @@ class ScreenshotTest {
             saveVisibleEditor()
             scrollToVisibleText("実行履歴（0回）")
             compose.onNode(hasText("完了") and hasClickAction()).performScrollTo().assertIsDisplayed().performClick()
+            waitForCompletionShown(1)
             scrollToVisibleText("実行履歴（1回）")
         }
     }
@@ -275,6 +278,34 @@ class ScreenshotTest {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             try { block(scenario) } catch (e: Throwable) { diagnostics.captureNow(); throw e }
         }
+
+    /**
+     * Waits after tapping 完了 until the database holds [count] completions and the history
+     * shows them. Compose waits for recomposition once new state arrives, but not for the
+     * database write or for Room to deliver the re-read data, so a fixed check right after
+     * the tap can come too early. (#53: suspected, not reproduced.)
+     */
+    private fun waitForCompletionShown(count: Int) {
+        var stored: Int? = null
+        try {
+            compose.waitUntil(10_000) { storedCompletions()?.also { stored = it } == count }
+        } catch (e: ComposeTimeoutException) {
+            throw AssertionError("Tapping 完了 should store $count completion(s); last count read: ${stored ?: "none (reads timed out)"}", e)
+        }
+        // The history header is a separate list item; bring it into the list before waiting.
+        compose.onNode(hasScrollAction()).performScrollToNode(hasText("実行履歴（", substring = true))
+        val history = "実行履歴（${count}回）"
+        try {
+            compose.waitUntil(10_000) { compose.onAllNodesWithText(history).fetchSemanticsNodes().isNotEmpty() }
+        } catch (e: ComposeTimeoutException) {
+            throw AssertionError("The database has $count completion(s) but the screen did not show $history", e)
+        }
+    }
+
+    // Counts across all tasks, giving up after 2 s so a stuck read cannot hang the test.
+    private fun storedCompletions(): Int? = runBlocking {
+        withTimeoutOrNull(2_000) { app.container.repository.snapshots.first().tasks.sumOf { it.completions.size } }
+    }
 
     private fun scrollToVisibleText(value: String) {
         compose.waitUntil(10_000) { compose.onAllNodes(hasScrollAction()).fetchSemanticsNodes().isNotEmpty() }
