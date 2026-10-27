@@ -3,8 +3,10 @@ package dev.tasknudge
 import android.app.Activity
 import android.os.SystemClock
 import android.view.inputmethod.InputMethodManager
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
@@ -37,6 +39,45 @@ fun ComposeTestRule.closeKeyboard() {
  * gesture.
  */
 fun ComposeTestRule.awaitKeyboardAreaSettled() = waitForKeyboardArea { true }
+
+/**
+ * Asks the system to show the keyboard for the focused view and waits until the keyboard
+ * area has kept a non-zero height for [KEYBOARD_QUIET_MS]. Returns false when no keyboard
+ * area appeared at all, for example on a device without a soft keyboard; fails when an
+ * area appeared but never settled.
+ */
+fun ComposeTestRule.showKeyboard(): Boolean {
+    runOnIdle {
+        val activity = resumedActivity()
+        val target = activity.currentFocus ?: activity.window.decorView
+        WindowCompat.getInsetsController(activity.window, target).show(WindowInsetsCompat.Type.ime())
+    }
+    var appeared = false
+    try {
+        waitForKeyboardArea { height -> if (height > 0) appeared = true; height > 0 }
+    } catch (e: ComposeTimeoutException) {
+        if (appeared) throw AssertionError("The keyboard area appeared but did not settle", e)
+        return false
+    }
+    return true
+}
+
+/**
+ * Top edge of the keyboard area in window coordinates, or null when no keyboard area is
+ * shown. Reads the window height and the keyboard area together. Assumes an edge-to-edge
+ * window, as MainActivity sets, so the window keeps its full height under the keyboard.
+ */
+fun keyboardTopInWindow(): Int? {
+    var top: Int? = null
+    InstrumentationRegistry.getInstrumentation().runOnMainSync {
+        val decor = resumedActivity().window.decorView
+        val insets = ViewCompat.getRootWindowInsets(decor)
+        if (insets != null && insets.isVisible(WindowInsetsCompat.Type.ime())) {
+            top = decor.height - insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+        }
+    }
+    return top
+}
 
 private fun ComposeTestRule.waitForKeyboardArea(accept: (height: Int) -> Boolean) {
     var last: Int? = null
