@@ -87,6 +87,7 @@ class BackupCodecTest {
             written.replace("\"title\": \"水", "\"title\": \"\\q水"),
             written.replace("\"title\": \"水", "\"title\": \"水\t"),
             written.replace("\"title\": \"水", "\"title\": \"\\u00g0水"),
+            written.replace("\"title\": \"水", "\"title\": \"\\u００６１水"),
             written.replace("\"recurrenceDays\": 3", "\"recurrenceDays\": 3e0"),
         )) assertEquals(invalid, BackupProblem.MALFORMED, problem(invalid))
     }

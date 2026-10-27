@@ -307,7 +307,8 @@ private fun malformed(): Nothing = throw InvalidBackupException(BackupProblem.MA
 private val jsonLiterals = setOf("true", "false", "null")
 private const val SIMPLE_ESCAPES = "\"\\/bfnrt"
 private const val UNICODE_ESCAPE_DIGITS = 4
-private const val HEX_RADIX = 16
+// Only ASCII: Char.digitToIntOrNull also accepts digits such as full-width ones.
+private const val HEX_DIGITS = "0123456789abcdefABCDEF"
 
 /**
  * [JsonReader] accepts literals in any case (`TRUE`) and unknown escapes (`\q` reads as
@@ -347,7 +348,7 @@ private fun escapeLength(text: String, start: Int): Int? = when (text.getOrNull(
     in SIMPLE_ESCAPES -> 1
     'u' -> (1 + UNICODE_ESCAPE_DIGITS).takeIf {
         val digits = text.substring(start + 1, minOf(text.length, start + 1 + UNICODE_ESCAPE_DIGITS))
-        digits.length == UNICODE_ESCAPE_DIGITS && digits.all { it.digitToIntOrNull(HEX_RADIX) != null }
+        digits.length == UNICODE_ESCAPE_DIGITS && digits.all { it in HEX_DIGITS }
     }
     else -> null
 }
