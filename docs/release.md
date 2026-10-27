@@ -34,7 +34,7 @@ workflow は、APK がこの鍵で署名されたことを証明書の SHA-256 �
 keytool -exportcert -keystore ~/secure/task-nudge-release.jks -alias tasknudge | sha256sum | cut -d' ' -f1
 ```
 
-64文字の16進数（例：`5d25f9cc…`）が出ます。この値は秘密ではありません。
+64文字の16進数（`0`〜`9` と `a`〜`f`）が1行出ます。この値は秘密ではありません。
 
 ### 3. GitHub に登録する
 
@@ -57,12 +57,12 @@ gh api -X PATCH repos/yutotamura55/task-nudge/actions/variables/TASK_NUDGE_RELEA
 ```
 `TASK_NUDGE_KEY_PASSWORD` には、`TASK_NUDGE_KEYSTORE_PASSWORD` と同じパスワードを入れます。
 
-登録した値は、GitHub のリポジトリのページの「Settings」→「Secrets and variables」→「Actions」で、名前だけ確かめられます（値は表示されません）。
+登録したものは、GitHub のリポジトリのページの「Settings」→「Secrets and variables」→「Actions」で確かめられます。secrets は名前だけが表示され、値は表示されません。変数（`TASK_NUDGE_RELEASE_CERT_SHA256`）は値も表示されます（秘密ではない値です）。
 
 ### 4. 試しに動かす
 
 Actions の「Release」→「Run workflow」で、main を選んで実行します。
-手動実行では Release を作らず、署名した APK を成果物 `task-nudge-release-check` に置くだけです（3日で消えます）。
+手動実行では Release を作らず、署名した APK を成果物 `task-nudge-release` に置くだけです（3日で消えます）。
 最後まで成功すれば、鍵と登録が正しく動いています。失敗した場合は、ログの最後のエラーに、足りない secrets か、証明書が一致しないことが表示されます。
 
 ## リリースごとに行うこと

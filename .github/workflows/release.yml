@@ -44,8 +44,9 @@ jobs:
             echo "Tag $GITHUB_REF_NAME does not match versionName $(version_name "$GITHUB_SHA") in app/build.gradle.kts" >&2
             exit 1
           fi
-          # A device updates only to a higher versionCode, so require one above the last release.
-          previous="$(git tag --list 'v*' --sort=-v:refname | grep -v -x "$GITHUB_REF_NAME" | head -n 1)"
+          # A device updates only to a higher versionCode, so require one above the last release
+          # before this commit (tags made later do not count when re-running an older release).
+          previous="$(git tag --merged "$GITHUB_SHA" --list 'v*' --sort=-v:refname | grep -v -x "$GITHUB_REF_NAME" | head -n 1 || true)"
           if [[ -n "$previous" && "$(version_code "$GITHUB_SHA")" -le "$(version_code "$previous")" ]]; then
             echo "versionCode $(version_code "$GITHUB_SHA") must be greater than $(version_code "$previous") in $previous" >&2
             exit 1
@@ -111,9 +112,19 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # On a re-run the release may already exist; replace its files instead of failing.
+          # Publish only if the tag still points to the commit that was checked and signed.
+          tagged="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME" --jq .sha)"
+          if [[ "$tagged" != "$GITHUB_SHA" ]]; then
+            echo "Tag $GITHUB_REF_NAME now points to $tagged, not the built commit $GITHUB_SHA" >&2
+            exit 1
+          fi
+          # On a re-run the release may already exist, possibly still a draft from an
+          # interrupted upload; replace its files and make sure it is published.
           if gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$GITHUB_REF_NAME" dist/* --clobber -R "$GITHUB_REPOSITORY"
+            if [[ "$(gh release view "$GITHUB_REF_NAME" -R "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft)" == true ]]; then
+              gh release edit "$GITHUB_REF_NAME" --draft=false -R "$GITHUB_REPOSITORY"
+            fi
           else
-            gh release create "$GITHUB_REF_NAME" dist/* --title "$GITHUB_REF_NAME" --generate-notes -R "$GITHUB_REPOSITORY"
+            gh release create "$GITHUB_REF_NAME" dist/* --verify-tag --title "$GITHUB_REF_NAME" --generate-notes -R "$GITHUB_REPOSITORY"
           fi
