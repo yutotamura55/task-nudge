@@ -81,7 +81,19 @@ class BackupCodecTest {
             written.replace("\"title\": \"水", "\"title\": [\"水\"], \"x\": \"水"),
             written.replace("\"archived\": true", "\"archived\": \"true\""),
             written.replace("  \"tasks\"", "  // comment\n  \"tasks\""),
+            // Android's JsonReader accepts these even when strict.
+            written.replace("\"archived\": true", "\"archived\": TRUE"),
+            written.replace("\"snoozedUntil\": null", "\"snoozedUntil\": Null"),
+            written.replace("\"title\": \"水", "\"title\": \"\\q水"),
+            written.replace("\"title\": \"水", "\"title\": \"水\t"),
+            written.replace("\"title\": \"水", "\"title\": \"\\u00g0水"),
+            written.replace("\"recurrenceDays\": 3", "\"recurrenceDays\": 3e0"),
         )) assertEquals(invalid, BackupProblem.MALFORMED, problem(invalid))
+    }
+
+    @Test fun acceptsTheEscapesJsonDefines() {
+        val escaped = text().replace("\"title\": \"水を飲む", "\"title\": \"\\u6c34\\/\\\"を飲む")
+        assertEquals("水/\"を飲む 💧", read(escaped).tasks[1].title)
     }
 
     @Test fun reportsInvalidValuesWithTheTaskNumber() {

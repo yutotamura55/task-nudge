@@ -13,6 +13,7 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStream
 import java.io.OutputStreamWriter
+import java.io.StringReader
 import java.nio.charset.CodingErrorAction
 import java.time.Instant
 import java.time.LocalDate
@@ -71,9 +72,13 @@ class BackupCodec(private val maxBytes: Long = MAX_BYTES) {
         val decoder = Charsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)
             .onUnmappableCharacter(CodingErrorAction.REPORT)
-        val reader = StrictJsonReader(JsonReader(InputStreamReader(LimitedInputStream(input, maxBytes), decoder)))
+        // The size limit keeps the whole text small enough to hold for the lexical check.
+        val text = runCatching { InputStreamReader(LimitedInputStream(input, maxBytes), decoder).readText() }
+            .getOrElse { throw it.asInvalidBackup() }
+        val reader = StrictJsonReader(JsonReader(StringReader(text)))
         val backup = runCatching { reader.readBackup().also { reader.endDocument() } }
             .getOrElse { throw it.asInvalidBackup() }
+        if (!hasWriterLexis(text)) malformed()
         return validateBackup(backup)
     }
 
@@ -298,3 +303,51 @@ private class StrictJsonReader(private val reader: JsonReader) {
 }
 
 private fun malformed(): Nothing = throw InvalidBackupException(BackupProblem.MALFORMED)
+
+private val jsonLiterals = setOf("true", "false", "null")
+private const val SIMPLE_ESCAPES = "\"\\/bfnrt"
+private const val UNICODE_ESCAPE_DIGITS = 4
+private const val HEX_RADIX = 16
+
+/**
+ * [JsonReader] accepts literals in any case (`TRUE`) and unknown escapes (`\q` reads as
+ * `q`) even when strict, so an edited file could change a value silently. Accepts only
+ * lowercase literals, the escapes JSON defines, and strings without raw control characters.
+ */
+private fun hasWriterLexis(text: String): Boolean {
+    var index = 0
+    var inString = false
+    var valid = true
+    while (valid && index < text.length) {
+        val char = text[index]
+        val consumed = when {
+            inString && char == '"' -> 1.also { inString = false }
+            inString && char < ' ' -> null
+            inString && char == '\\' -> escapeLength(text, index + 1)?.plus(1)
+            inString -> 1
+            char == '"' -> 1.also { inString = true }
+            char.isLetter() -> literalLength(text, index)
+            else -> 1
+        }
+        if (consumed == null) valid = false else index += consumed
+    }
+    return valid && !inString
+}
+
+/** The length of the lowercase JSON literal at [start], or null for any other word. */
+private fun literalLength(text: String, start: Int): Int? {
+    var end = start
+    while (end < text.length && text[end].isLetter()) end++
+    return (end - start).takeIf { text.substring(start, end) in jsonLiterals }
+}
+
+/** The characters after a backslash at [start], or null when the escape is not JSON. */
+private fun escapeLength(text: String, start: Int): Int? = when (text.getOrNull(start)) {
+    null -> null
+    in SIMPLE_ESCAPES -> 1
+    'u' -> (1 + UNICODE_ESCAPE_DIGITS).takeIf {
+        val digits = text.substring(start + 1, minOf(text.length, start + 1 + UNICODE_ESCAPE_DIGITS))
+        digits.length == UNICODE_ESCAPE_DIGITS && digits.all { it.digitToIntOrNull(HEX_RADIX) != null }
+    }
+    else -> null
+}
