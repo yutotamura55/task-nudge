@@ -1,5 +1,7 @@
 package dev.tasknudge.data
 
+import dev.tasknudge.core.BackupCompletion
+import dev.tasknudge.core.BackupTask
 import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.core.ReminderTask
 import java.time.Instant
@@ -66,3 +68,26 @@ internal fun TaskWithCompletions.reminderTask(today: LocalDate): ReminderTask {
         snoozedUntil = task.snoozedUntil?.let(Instant::ofEpochMilli),
     )
 }
+
+internal fun TaskWithCompletions.backupTask() = BackupTask(
+    title = task.title,
+    recurrenceDays = task.recurrenceDays,
+    recurrenceHours = task.recurrenceHours,
+    createdAt = Instant.ofEpochMilli(task.createdAt),
+    archived = task.archived,
+    snoozedUntil = task.snoozedUntil?.let(Instant::ofEpochMilli),
+    completions = completions.sortedWith(compareBy({ it.completedAt }, { it.localDate }))
+        .map { BackupCompletion(Instant.ofEpochMilli(it.completedAt), LocalDate.parse(it.localDate)) },
+)
+
+internal fun BackupCompletion.entity(taskId: Long) =
+    CompletionEntity(taskId = taskId, completedAt = completedAt.toEpochMilli(), localDate = localDate.toString())
+
+internal fun BackupTask.entity() = TaskEntity(
+    title = title,
+    recurrenceDays = recurrenceDays,
+    recurrenceHours = recurrenceHours,
+    createdAt = createdAt.toEpochMilli(),
+    archived = archived,
+    snoozedUntil = snoozedUntil?.toEpochMilli(),
+)

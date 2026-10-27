@@ -3,19 +3,33 @@ package dev.tasknudge.ui
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dev.tasknudge.core.*
+import dev.tasknudge.data.BackupCodec
+import dev.tasknudge.data.BackupDocument
 import dev.tasknudge.data.TaskRepository
+import java.time.Clock
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
-class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
+class TaskViewModel(
+    private val repository: TaskRepository,
+    private val clock: Clock = Clock.systemUTC(),
+    /** Reads and writes picked files off the main thread. */
+    private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO,
+) : ViewModel() {
     private val mutableState = MutableStateFlow(TaskUiState())
     val state = mutableState.asStateFlow()
     private val observationAttempt = MutableStateFlow(0L)
     private var nextSessionId = 0L
+    private val backupCodec = BackupCodec()
+    /** The validated file waiting for confirmation, owned by the session that picked it. */
+    private var pendingImport: Pair<Long, Backup>? = null
 
     init {
         // collectLatest joins the previous collector before starting a retry.
@@ -42,6 +56,7 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
         if (restoredId == state.value.operation.sessionId) return restoredId
         val id = restoredId ?: (nextSessionId + 1)
         nextSessionId = maxOf(nextSessionId, id)
+        pendingImport = null
         mutableState.update { it.copy(operation = ScreenOperation(id), titleError = null, bulkError = null, recurrenceError = null, settingsError = null) }
         return id
     }
@@ -52,6 +67,16 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
         mutableState.update {
             if (it.operation == ScreenOperation(sessionId, OperationState.Committed(OperationResult.Updated)))
                 it.copy(operation = ScreenOperation(sessionId)) else it
+        }
+    }
+
+    /** Closes the export or import result so the screen accepts another file. */
+    fun dismissBackupResult(sessionId: Long) {
+        mutableState.update {
+            val result = (it.operation.state as? OperationState.Committed)?.result
+            val isBackupResult = result is OperationResult.BackupExported || result is OperationResult.BackupImported
+            if (it.operation.sessionId == sessionId && isBackupResult) it.copy(operation = ScreenOperation(sessionId))
+            else it
         }
     }
 
@@ -99,18 +124,98 @@ class TaskViewModel(private val repository: TaskRepository) : ViewModel() {
     fun completeTask(id: Long, sessionId: Long = state.value.operation.sessionId) = mutate(sessionId) { repository.completeTask(id); OperationResult.Updated }
     fun setArchived(id: Long, archived: Boolean, sessionId: Long = state.value.operation.sessionId) = mutate(sessionId) { repository.setArchived(id, archived); OperationResult.Updated }
 
+    /** Writes the current data to [document]. A failed write tries to remove the partial file. */
+    fun exportBackup(document: BackupDocument, sessionId: Long = state.value.operation.sessionId) {
+        if (!canSubmit(sessionId)) return
+        launchOperation(sessionId, "書き出せませんでした。保存先を確かめて、もう一度お試しください。") {
+            val backup = repository.exportBackup()
+            withContext(ioDispatcher) {
+                var written = false
+                try {
+                    document.openOutput().use { backupCodec.write(backup, clock.instant(), it) }
+                    written = true
+                } finally {
+                    // Deleting is best effort; the write failure is what the user sees.
+                    if (!written) runCatching { document.delete() }
+                }
+            }
+            OperationResult.BackupExported(backup.tasks.size)
+        }
+    }
+
+    /** Reads and validates [document] without changing data, then asks for confirmation. */
+    fun prepareImport(document: BackupDocument, sessionId: Long = state.value.operation.sessionId) {
+        if (!canSubmit(sessionId)) return
+        pendingImport = null
+        mutableState.update { it.copy(operation = ScreenOperation(sessionId, OperationState.Saving)) }
+        viewModelScope.launch {
+            val next = try {
+                val backup = withContext(ioDispatcher) { document.openInput().use(backupCodec::read) }
+                if (state.value.operation.sessionId == sessionId) pendingImport = sessionId to backup
+                OperationState.ConfirmingImport(backup.preview())
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (invalid: InvalidBackupException) { OperationState.Failed(invalid.displayMessage()) }
+            catch (_: Exception) { OperationState.Failed("ファイルを開けませんでした。もう一度お試しください。") }
+            mutableState.update {
+                if (it.operation.sessionId == sessionId) it.copy(operation = ScreenOperation(sessionId, next)) else it
+            }
+        }
+    }
+
+    fun confirmImport(sessionId: Long = state.value.operation.sessionId) {
+        val (owner, backup) = pendingImport ?: return
+        val confirming = ScreenOperation(sessionId, OperationState.ConfirmingImport(backup.preview()))
+        if (owner != sessionId || state.value.operation != confirming) return
+        pendingImport = null
+        launchOperation(sessionId, "読み込めませんでした。データは変わっていません。") {
+            repository.replaceWithBackup(backup)
+            OperationResult.BackupImported(backup.tasks.size)
+        }
+    }
+
+    fun cancelImport(sessionId: Long = state.value.operation.sessionId) {
+        if (pendingImport?.first == sessionId) pendingImport = null
+        mutableState.update {
+            if (it.operation.sessionId == sessionId && it.operation.state is OperationState.ConfirmingImport)
+                it.copy(operation = ScreenOperation(sessionId)) else it
+        }
+    }
+
     private fun canSubmit(sessionId: Long) = state.value.operation.sessionId == sessionId && state.value.canSubmit
 
     private fun mutate(sessionId: Long, action: suspend () -> OperationResult) {
         if (!canSubmit(sessionId)) return
+        launchOperation(sessionId, "保存できませんでした。もう一度お試しください。", action)
+    }
+
+    private fun launchOperation(sessionId: Long, failureMessage: String, action: suspend () -> OperationResult) {
         mutableState.update { it.copy(operation = ScreenOperation(sessionId, OperationState.Saving)) }
         viewModelScope.launch {
             val result = try { OperationState.Committed(action()) }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { OperationState.Failed("保存できませんでした。もう一度お試しください。") }
+            catch (_: Exception) { OperationState.Failed(failureMessage) }
             mutableState.update { if (it.operation.sessionId == sessionId) it.copy(operation = ScreenOperation(sessionId, result)) else it }
         }
     }
+}
+
+private fun Backup.preview() = ImportPreview(tasks.size, tasks.sumOf { it.completions.size })
+
+internal fun InvalidBackupException.displayMessage(): String {
+    val where = taskNumber?.let { "${it}件目のタスクの" } ?: ""
+    val reason = when (problem) {
+        BackupProblem.NOT_A_BACKUP -> "このアプリで書き出したファイルではありません。"
+        BackupProblem.NEWER_VERSION -> "新しい版のアプリで書き出したファイルです。アプリを更新してから読み込んでください。"
+        BackupProblem.TOO_LARGE -> "ファイルが大きすぎます（上限 ${BackupCodec.MAX_MEGABYTES} MB）。"
+        BackupProblem.MALFORMED -> "ファイルの形式が壊れています。"
+        BackupProblem.SETTINGS -> "通知の時間または間隔が範囲外です。"
+        BackupProblem.TOO_MANY_TASKS -> "タスクが${MAX_BACKUP_TASKS}件を超えています。"
+        BackupProblem.TITLE -> "${where}名前が${titleLengthRange.first}〜${titleLengthRange.last}文字ではありません。"
+        BackupProblem.RECURRENCE -> "${where}繰り返しが範囲外です。"
+        BackupProblem.DATE_TIME -> "${where}日時が正しくありません。"
+        BackupProblem.DUPLICATE_COMPLETION -> "${where}完了記録が重複しています。"
+    }
+    return "読み込めませんでした。${reason}データは変わっていません。"
 }
 
 internal fun InputError.message(): String = when (this) {

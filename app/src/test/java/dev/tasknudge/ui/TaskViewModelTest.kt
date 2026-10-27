@@ -1,16 +1,23 @@
 package dev.tasknudge.ui
 
-import dev.tasknudge.core.ReminderSettings
-import dev.tasknudge.core.TaskInput
+import android.app.Application
+import dev.tasknudge.core.*
 import dev.tasknudge.data.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
 import org.junit.*
 import org.junit.Assert.*
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import java.io.*
 import java.time.Instant
 import java.time.LocalDate
 
+// Robolectric provides android.util.JsonReader for the backup file.
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35], application = Application::class)
 @OptIn(ExperimentalCoroutinesApi::class)
 class TaskViewModelTest {
     @Test fun bulkSavePassesTrimmedLinesAndOneIntervalAsOneCommand() = runTest(dispatcher) {
@@ -60,6 +67,83 @@ class TaskViewModelTest {
         assertEquals("開始は0〜23時、終了は1〜24時の整数で、開始より後に設定してください。間隔は5・10・15・30・60・120分です。", vm.state.value.settingsError)
         assertTrue(repo.saved.isEmpty() && repo.bulkSaved.isEmpty() && repo.settings.isEmpty())
     }
+    @Test fun exportWritesTheRepositoryBackupAndReportsTheTaskCount() = runTest(dispatcher) {
+        val repo = FakeRepository().apply { backup = sampleBackup }
+        val vm = TaskViewModel(repo, ioDispatcher = dispatcher)
+        val document = MemoryDocument()
+        vm.exportBackup(document); runCurrent()
+        assertEquals(OperationState.Committed(OperationResult.BackupExported(1)), vm.state.value.operation.state)
+        assertEquals(sampleBackup, BackupCodec().read(document.written.toByteArray().inputStream()))
+        vm.exportBackup(MemoryDocument()); runCurrent()
+        assertEquals(OperationState.Committed(OperationResult.BackupExported(1)), vm.state.value.operation.state)
+        vm.dismissBackupResult(vm.state.value.operation.sessionId)
+        assertEquals(OperationState.Idle, vm.state.value.operation.state)
+    }
+    @Test fun failedExportRemovesThePartialFile() = runTest(dispatcher) {
+        val repo = FakeRepository().apply { backup = sampleBackup }
+        val vm = TaskViewModel(repo, ioDispatcher = dispatcher)
+        val document = MemoryDocument(failWrite = true)
+        vm.exportBackup(document); runCurrent()
+        assertTrue(document.deleted)
+        assertTrue(vm.state.value.operation.state is OperationState.Failed)
+    }
+    @Test fun importChangesNothingUntilConfirmed() = runTest(dispatcher) {
+        val repo = FakeRepository(); val vm = TaskViewModel(repo, ioDispatcher = dispatcher)
+        vm.prepareImport(MemoryDocument(sampleBackup)); runCurrent()
+        assertEquals(OperationState.ConfirmingImport(ImportPreview(1, 2)), vm.state.value.operation.state)
+        assertTrue(repo.imported.isEmpty())
+        vm.cancelImport(); runCurrent()
+        assertEquals(OperationState.Idle, vm.state.value.operation.state)
+        vm.confirmImport(); runCurrent()
+        assertTrue(repo.imported.isEmpty())
+
+        vm.prepareImport(MemoryDocument(sampleBackup)); runCurrent()
+        vm.confirmImport(); runCurrent()
+        assertEquals(listOf(sampleBackup), repo.imported)
+        assertEquals(OperationState.Committed(OperationResult.BackupImported(1)), vm.state.value.operation.state)
+        vm.confirmImport(); runCurrent()
+        assertEquals(1, repo.imported.size)
+    }
+    @Test fun invalidImportFileExplainsWhyWithoutShowingItsContent() = runTest(dispatcher) {
+        val repo = FakeRepository(); val vm = TaskViewModel(repo, ioDispatcher = dispatcher)
+        val secret = "秘密のタスク名"
+        val task = sampleBackup.tasks.single().copy(title = secret, recurrenceDays = 1)
+        val document = MemoryDocument(sampleBackup.copy(tasks = listOf(task)))
+        document.content = document.content.replace("\"recurrenceDays\": 1", "\"recurrenceDays\": 400")
+        vm.prepareImport(document); runCurrent()
+        val message = (vm.state.value.operation.state as OperationState.Failed).message
+        assertEquals("読み込めませんでした。1件目のタスクの繰り返しが範囲外です。データは変わっていません。", message)
+        assertFalse(message.contains(secret))
+        vm.prepareImport(MemoryDocument(failRead = true)); runCurrent()
+        assertEquals("ファイルを開けませんでした。もう一度お試しください。", (vm.state.value.operation.state as OperationState.Failed).message)
+        assertTrue(repo.imported.isEmpty())
+    }
+    @Test fun pendingImportBelongsToTheSessionThatPickedIt() = runTest(dispatcher) {
+        val repo = FakeRepository(); val vm = TaskViewModel(repo, ioDispatcher = dispatcher)
+        val old = vm.beginScreenSession()
+        vm.prepareImport(MemoryDocument(sampleBackup), old); runCurrent()
+        val current = vm.beginScreenSession()
+        vm.confirmImport(old); vm.confirmImport(current); runCurrent()
+        assertTrue(repo.imported.isEmpty())
+        assertEquals(ScreenOperation(current), vm.state.value.operation)
+    }
+    @Test fun failedImportKeepsDataAndCanBeRetried() = runTest(dispatcher) {
+        val repo = FakeRepository().apply { fail = true }; val vm = TaskViewModel(repo, ioDispatcher = dispatcher)
+        vm.prepareImport(MemoryDocument(sampleBackup)); runCurrent()
+        vm.confirmImport(); runCurrent()
+        assertEquals("読み込めませんでした。データは変わっていません。", (vm.state.value.operation.state as OperationState.Failed).message)
+        repo.fail = false
+        vm.prepareImport(MemoryDocument(sampleBackup)); runCurrent()
+        vm.confirmImport(); runCurrent()
+        assertEquals(listOf(sampleBackup), repo.imported)
+    }
+    private val sampleBackup = Backup(
+        ReminderSettings(8, 22, 15),
+        listOf(BackupTask("首", 2, null, Instant.parse("2026-09-30T00:00:00Z"), false, null, listOf(
+            BackupCompletion(Instant.parse("2026-10-01T01:00:00Z"), LocalDate.of(2026, 10, 1)),
+            BackupCompletion(Instant.parse("2026-10-03T01:00:00Z"), LocalDate.of(2026, 10, 3)),
+        ))),
+    )
     private val dispatcher = StandardTestDispatcher()
     @Before fun setup() { Dispatchers.setMain(dispatcher) }
     @After fun cleanup() { Dispatchers.resetMain() }
@@ -386,4 +470,32 @@ private class FakeRepository(emitFailure: Boolean = false) : TaskRepository {
         this.settings += settings
     }
     override suspend fun recordPermissionRequest() {}
+    var backup = Backup(ReminderSettings(), emptyList())
+    val imported = mutableListOf<Backup>()
+    override suspend fun exportBackup(): Backup {
+        if (fail) error("disk")
+        return backup
+    }
+    override suspend fun replaceWithBackup(backup: Backup) {
+        settingsGate?.await()
+        if (fail) error("disk")
+        imported += backup
+    }
+}
+
+private class MemoryDocument(
+    backup: Backup? = null,
+    private val failWrite: Boolean = false,
+    private val failRead: Boolean = false,
+) : BackupDocument {
+    var content = backup?.let { encode(it) } ?: ""
+    val written = ByteArrayOutputStream()
+    var deleted = false
+    override fun openOutput(): OutputStream =
+        if (failWrite) object : OutputStream() { override fun write(b: Int) = throw IOException("full") } else written
+    override fun openInput(): InputStream =
+        if (failRead) throw IOException("gone") else ByteArrayInputStream(content.toByteArray(Charsets.UTF_8))
+    override fun delete() { deleted = true }
+    private fun encode(backup: Backup) =
+        ByteArrayOutputStream().also { BackupCodec().write(backup, Instant.EPOCH, it) }.toString(Charsets.UTF_8.name())
 }

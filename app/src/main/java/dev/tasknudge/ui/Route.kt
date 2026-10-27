@@ -11,6 +11,7 @@ sealed interface Route {
     data class Editor(val taskId: Long?) : Route
     data object Bulk : Route
     data object Settings : Route
+    data object Backup : Route
 
     val title: String
         get() = when (this) {
@@ -19,11 +20,19 @@ sealed interface Route {
             is Editor -> if (taskId == null) "タスクを追加" else "タスクを編集"
             Bulk -> "まとめて追加"
             Settings -> "通知設定"
+            Backup -> "データの書き出しと読み込み"
         }
 
-    /** Editing an existing task returns to its detail; every other screen returns to the list. */
+    /**
+     * Editing an existing task returns to its detail and the backup screen to settings;
+     * every other screen returns to the list.
+     */
     val back: Route
-        get() = if (this is Editor && taskId != null) Detail(taskId) else TaskList
+        get() = when {
+            this is Editor && taskId != null -> Detail(taskId)
+            this == Backup -> Settings
+            else -> TaskList
+        }
 
     /** The task this screen cannot be shown without. */
     val requiredTaskId: Long?
@@ -42,6 +51,7 @@ sealed interface Route {
                     is Editor -> listOfNotNull("editor", route.taskId)
                     Bulk -> listOf("bulk")
                     Settings -> listOf("settings")
+                    Backup -> listOf("backup")
                 }
             },
             restore = { saved ->
@@ -51,6 +61,7 @@ sealed interface Route {
                     "editor" -> Editor(taskId)
                     "bulk" -> Bulk
                     "settings" -> Settings
+                    "backup" -> Backup
                     else -> TaskList
                 }
             },

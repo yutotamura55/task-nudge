@@ -1,5 +1,6 @@
 package dev.tasknudge.data
 
+import dev.tasknudge.core.Backup
 import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.core.TaskInput
 import kotlinx.coroutines.flow.Flow
@@ -20,4 +21,12 @@ interface TaskRepository {
     suspend fun completeTask(id: Long)
     suspend fun saveSettings(settings: ReminderSettings)
     suspend fun recordPermissionRequest()
+    /** Reads tasks, completions and settings from one consistent database state. */
+    suspend fun exportBackup(): Backup
+    /**
+     * Replaces every task, completion and the reminder settings with [backup] in one
+     * transaction; a failure leaves the previous data. Device state such as the
+     * notification permission request is kept.
+     */
+    suspend fun replaceWithBackup(backup: Backup)
 }

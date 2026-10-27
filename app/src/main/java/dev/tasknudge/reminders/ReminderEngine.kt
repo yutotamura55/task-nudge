@@ -54,11 +54,34 @@ class ReminderEngine(
         override suspend fun completeTask(id: Long) { mutate(id) { complete(id) } }
         override suspend fun saveSettings(settings: ReminderSettings) {
             validateSettings(settings)
-            mutate(null) {
-                dao.saveSettings(dao.settings().copy(startHour = settings.startHour, endHour = settings.endHour, intervalMinutes = settings.intervalMinutes))
-            }
+            mutate(null) { saveReminderSettings(settings) }
         }
         override suspend fun recordPermissionRequest() { mutate(null) { dao.saveSettings(dao.settings().copy(permissionRequested = true)) } }
+        override suspend fun exportBackup(): Backup = database.withTransaction {
+            val settings = dao.settings().core()
+            Backup(settings, dao.tasks().map { it.backupTask() })
+        }
+        override suspend fun replaceWithBackup(backup: Backup) {
+            validateBackup(backup)
+            // Deleting the stored reminders lets the reconciliation after the commit
+            // cancel every notification that still shows the previous data.
+            mutate(null) {
+                dao.deleteAllReminders()
+                dao.deleteAllCompletions()
+                dao.deleteAllTasks()
+                for (task in backup.tasks) {
+                    val id = dao.insertTask(task.entity())
+                    dao.insertCompletions(task.completions.map { it.entity(id) })
+                }
+                saveReminderSettings(backup.settings)
+            }
+        }
+    }
+
+    /** Keeps the permission request, which belongs to this device rather than to the user's settings. */
+    private suspend fun saveReminderSettings(settings: ReminderSettings) {
+        val (startHour, endHour, interval) = settings
+        dao.saveSettings(dao.settings().copy(startHour = startHour, endHour = endHour, intervalMinutes = interval))
     }
 
     private suspend fun <T> mutate(invalidateTaskId: Long?, write: suspend () -> T): T = mutex.withLock {

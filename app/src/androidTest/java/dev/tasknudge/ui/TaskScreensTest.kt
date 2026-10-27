@@ -25,6 +25,7 @@ import android.view.inputmethod.InputConnection
 import androidx.test.uiautomator.UiDevice
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
+import dev.tasknudge.core.Backup
 import dev.tasknudge.core.ReminderSettings
 import dev.tasknudge.core.TaskInput
 import dev.tasknudge.data.*
@@ -110,7 +111,7 @@ class TaskScreensTest {
                 SettingsScreen(
                     SettingsContent(ReminderSettings(9, 21, 30), permissionRequested = false, notificationsEnabled = true, exactAlarmAccessGranted = false),
                     TaskUiState(),
-                    SettingsActions(onEnableNotifications = {}, onSave = { _, _, _ -> }, onEnableExactAlarm = { requests++ }),
+                    SettingsActions(onEnableNotifications = {}, onSave = { _, _, _ -> }, onEnableExactAlarm = { requests++ }, onOpenBackup = {}),
                 )
             }
         }
@@ -744,6 +745,8 @@ private class ScreenRepository(tasks: List<TaskSnapshot> = emptyList(), private 
     }
     override suspend fun saveSettings(settings: ReminderSettings) { data.value = data.value.copy(settings = settings) }
     override suspend fun recordPermissionRequest() { data.value = data.value.copy(permissionRequested = true) }
+    override suspend fun exportBackup() = Backup(data.value.settings, emptyList())
+    override suspend fun replaceWithBackup(backup: Backup) = Unit
 }
 
 private fun isEmulator() = Build.FINGERPRINT.contains("generic") || Build.MODEL.contains("sdk_gphone")
