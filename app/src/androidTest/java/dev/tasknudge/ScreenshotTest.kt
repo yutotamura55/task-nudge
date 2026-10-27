@@ -10,6 +10,9 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleCallback
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
 import androidx.test.uiautomator.By
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
@@ -171,6 +174,11 @@ class ScreenshotTest {
         val notification = app.awaitActiveReminder()
         val originalAccessibilityFlags = instrumentation.uiAutomation.serviceInfo.flags
         val monitor = instrumentation.addMonitor(MainActivity::class.java.name, null, false)
+        val resumed = mutableListOf<MainActivity>()
+        val recordResume = ActivityLifecycleCallback { resumedActivity, stage ->
+            if (stage == Stage.RESUMED && resumedActivity is MainActivity) synchronized(resumed) { resumed += resumedActivity }
+        }
+        ActivityLifecycleMonitorRegistry.getInstance().addLifecycleCallback(recordResume)
         var activity: MainActivity? = null
         try {
             tapReminderNotification("通知から開く")
@@ -181,7 +189,12 @@ class ScreenshotTest {
             scrollToVisibleText("実行履歴（0回）")
             compose.onNodeWithContentDescription("戻る").performClick()
             waitForAddFabVisible()
+            val resumesBeforeTap = synchronized(resumed) { resumed.size }
             tapReminderNotification("通知から開く")
+            // Delivering the tap to the open activity pauses and resumes it; Compose finds no
+            // screen while it is paused, so wait for that resume before querying.
+            compose.waitUntil(10_000) { synchronized(resumed) { resumed.size > resumesBeforeTap } }
+            assertSame("The tap should reopen the existing MainActivity", activity, synchronized(resumed) { resumed.last() })
             compose.waitUntil(10_000) { compose.onAllNodesWithText("タスクの詳細").fetchSemanticsNodes().isNotEmpty() }
             scrollToVisibleText("実行履歴（0回）")
             assertEquals(taskId, notification.notification.extras.getLong("taskId"))
@@ -190,6 +203,7 @@ class ScreenshotTest {
             diagnostics.captureNow()
             throw e
         } finally {
+            ActivityLifecycleMonitorRegistry.getInstance().removeLifecycleCallback(recordResume)
             activity?.runOnUiThread { activity?.finish() }
             instrumentation.removeMonitor(monitor)
             shell("cmd statusbar collapse")
