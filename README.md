@@ -21,11 +21,11 @@
 
 対応は **Android 8.0（API 26）以上**です。ストアでは配布していません。
 
-1. Android 端末のブラウザで、このリポジトリの [Releases](https://github.com/yutotamura55/task-nudge/releases) を開き、最新の版の `task-nudge-v….apk` をダウンロードします（GitHub のアカウントは要りません）。
-2. ダウンロードした APK を開きます。初めてのときは、端末から「この提供元のアプリを許可」などの確認が出るので、許可してからインストールします。
+1. Android 端末のブラウザで、このリポジトリの [Releases](https://github.com/yutotamura55/task-nudge/releases) を開きます。いちばん上（最新）の版の「Assets」の中にある、`task-nudge-v0.1.0.apk` のような `.apk` で終わるファイルをダウンロードします（`.sha256` で終わるファイルではありません）。GitHub のアカウントは要りません。「Assets」が閉じていたら、押して開きます。
+2. ダウンロードした APK を開きます。初めてのときは、提供元を許可していないという確認が出ます。「設定」を押し、「この提供元のアプリを許可」をオンにしてから戻ると、インストールできます。
 3. 新しい版が出たら、同じ手順で上書きします。記録は残ります。
 
-Releases の APK は、すべて同じ鍵で署名しています。ほかの方法（GitHub Actions の成果物や、自分でビルドしたもの）で入れたアプリは署名が違うので、Releases の APK で上書きできません。その場合は入れ直しが必要で、端末内の記録は消えます。リリースの作り方は [docs/release.md](docs/release.md) にあります。
+Releases の APK は、すべて同じ鍵で署名しています。開発用の debug APK（GitHub Actions の「Android」の実行の成果物 `task-nudge-debug` や、自分でビルドしたもの）は署名が違うので、それで入れたアプリは Releases の APK で上書きできません。その場合は入れ直しが必要で、端末内の記録は消えます。リリースの作り方は [docs/release.md](docs/release.md) にあります。
 
 Android 13 以上では、明示的に「通知を有効にする」を押したときだけ通知権限を求めます。拒否後は端末のアプリ通知設定から変更できます。Android 8〜12 でも端末全体または通知チャンネルを無効にすると通知されません。
 
