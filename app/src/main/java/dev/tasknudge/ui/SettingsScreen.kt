@@ -26,6 +26,7 @@ class SettingsActions(
     /** Receives the entered start and end hours as typed, and the selected interval in minutes. */
     val onSave: (String, String, Int) -> Unit,
     val onEnableExactAlarm: () -> Unit,
+    val onOpenBackup: () -> Unit,
 )
 
 @Composable
@@ -54,6 +55,11 @@ fun SettingsScreen(content: SettingsContent, state: TaskUiState, actions: Settin
         Button(onClick = { actions.onSave(start, end, interval) }, enabled = state.canSubmit, modifier = Modifier.fillMaxWidth()) { Text(if (state.saving) "保存中…" else if (!state.canSubmit) "保存済み" else "保存") }
         HorizontalDivider()
         Text("通知は端末の状態により遅れることがあります。保留は24時間です。強制停止後は、アプリを開くと通知を再開します。")
-        Text("データはこの端末内にのみ保存します。クラウド保存・端末移行・エクスポートには対応していません。アプリを削除すると記録も失われます。", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "データはこの端末内にのみ保存し、クラウドには保存しません。アプリを削除すると記録も失われます。" +
+                "削除する前や別の版に入れ替える前に、ファイルに書き出してください。",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        OutlinedButton(onClick = actions.onOpenBackup, modifier = Modifier.fillMaxWidth()) { Text("データの書き出しと読み込み") }
     }
 }

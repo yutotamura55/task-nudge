@@ -2,8 +2,7 @@ package dev.tasknudge.reminders
 
 import android.app.Application
 import androidx.room.Room
-import dev.tasknudge.core.ReminderSettings
-import dev.tasknudge.core.TaskInput
+import dev.tasknudge.core.*
 import dev.tasknudge.data.*
 import java.time.*
 import kotlinx.coroutines.*
@@ -367,6 +366,54 @@ class ReminderEngineTest {
         assertTrue(db.dao().activeReminders().isEmpty())
         assertNull(gateway.visibleToken)
         assertNull(repo.snapshots.first().tasks.single().snoozedUntil)
+    }
+    @Test fun backupRestoresTasksHistoryAndSettingsButKeepsDeviceState() = runTest {
+        repo.saveSettings(ReminderSettings(8, 22, 15))
+        val daily = repo.saveTask(null, "首", 2)
+        repo.completeTask(daily)
+        val hourly = repo.saveTask(null, "水", recurrenceHours = 3)
+        repo.setArchived(hourly, true)
+        repo.recordPermissionRequest()
+        val backup = repo.exportBackup()
+        assertEquals(listOf("首", "水"), backup.tasks.map { it.title })
+        assertEquals(1, backup.tasks.first().completions.size)
+
+        repo.saveTask(null, "消える")
+        repo.saveSettings(ReminderSettings(9, 21, 30))
+        repo.replaceWithBackup(backup)
+
+        assertEquals(backup, repo.exportBackup())
+        val snapshot = repo.snapshots.first()
+        assertEquals(ReminderSettings(8, 22, 15), snapshot.settings)
+        assertTrue(snapshot.permissionRequested)
+        assertEquals(listOf(false, true), snapshot.tasks.map { it.archived })
+    }
+    @Test fun replacingDataCancelsRemindersForThePreviousTasks() = runTest {
+        repo.saveSettings(ReminderSettings(0, 24, 15))
+        repo.saveTask(null, "首"); engine.evaluate()
+        assertEquals(1, gateway.activeCount)
+        val restored = BackupTask("腕", 1, null, clock.instant(), false, null, emptyList())
+        repo.replaceWithBackup(Backup(ReminderSettings(0, 24, 15), listOf(restored)))
+        assertEquals(0, gateway.activeCount)
+        assertTrue(db.dao().activeReminders().isEmpty())
+        // The next reminder is for the restored task and does not reuse the old notification ID.
+        clock.advance(Duration.ofMinutes(15)); engine.evaluate()
+        assertEquals("腕", gateway.title)
+        assertEquals(2, db.dao().activeReminders().single().notificationId)
+    }
+    @Test fun invalidOrFailingReplacementKeepsThePreviousData() = runTest {
+        repo.saveTask(null, "首")
+        val before = repo.exportBackup()
+        val requests = scheduler.requests
+        val task = BackupTask("腕", 1, null, clock.instant(), false, null, emptyList())
+        val outOfRange = Backup(ReminderSettings(), listOf(task.copy(recurrenceDays = 0)))
+        val invalid = runCatching { repo.replaceWithBackup(outOfRange) }.exceptionOrNull()
+        assertEquals(BackupProblem.RECURRENCE, (invalid as InvalidBackupException).problem)
+        db.openHelper.writableDatabase.execSQL("CREATE TRIGGER reject_arm BEFORE INSERT ON tasks WHEN NEW.title = '腕' BEGIN SELECT RAISE(ABORT, 'rejected'); END")
+        val rejectedOnInsert = Backup(ReminderSettings(8, 22, 15), listOf(task.copy(title = "脚"), task))
+        assertTrue(runCatching { repo.replaceWithBackup(rejectedOnInsert) }.isFailure)
+        assertEquals(before, repo.exportBackup())
+        assertEquals(requests, scheduler.requests)
     }
     private suspend fun reserve(id: Long, token: String, delivered: Boolean) {
         db.dao().insertActiveReminder(ActiveReminderEntity(taskId = id, token = token, localDate = "2026-10-01", preparedAt = clock.millis(), deliveredAt = if (delivered) clock.millis() else null))

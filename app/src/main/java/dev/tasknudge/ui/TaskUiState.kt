@@ -18,12 +18,19 @@ sealed interface OperationResult {
     data class TasksSaved(val count: Int) : OperationResult
     data object SettingsSaved : OperationResult
     data object Updated : OperationResult
+    data class BackupExported(val taskCount: Int) : OperationResult
+    data class BackupImported(val taskCount: Int) : OperationResult
 }
+
+/** What a picked backup file would replace the current data with. */
+data class ImportPreview(val taskCount: Int, val completionCount: Int)
 
 sealed interface OperationState {
     data object Idle : OperationState
     data object Saving : OperationState
     data class Committed(val result: OperationResult) : OperationState
+    /** A backup file was read and validated; nothing changes until the user confirms. */
+    data class ConfirmingImport(val preview: ImportPreview) : OperationState
     data class Failed(val message: String) : OperationState
 }
 

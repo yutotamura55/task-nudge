@@ -1,12 +1,15 @@
 package dev.tasknudge.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
@@ -18,6 +21,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.tasknudge.data.AppSnapshot
+import dev.tasknudge.data.BackupCodec
+import dev.tasknudge.data.ContentBackupDocument
 import dev.tasknudge.data.TaskRepository
 import dev.tasknudge.data.TaskSnapshot
 import kotlinx.coroutines.delay
@@ -40,7 +45,7 @@ fun TaskNudgeApp(
     exactAlarmAccessGranted: Boolean = true,
     onEnableExactAlarm: () -> Unit = {},
 ) {
-    val vm = rememberTaskViewModel(repository)
+    val vm = rememberTaskViewModel(repository, clock)
     var route by rememberSaveable(stateSaver = Route.saver) {
         mutableStateOf(if (initialTaskId == null) Route.TaskList else Route.Detail(initialTaskId))
     }
@@ -77,7 +82,8 @@ fun TaskNudgeApp(
                 is OperationResult.TasksSaved -> if (route == Route.Bulk) navigate(Route.TaskList)
                 OperationResult.SettingsSaved -> if (route == Route.Settings) navigate(Route.TaskList)
                 OperationResult.Updated -> vm.consumeOperation(sessionId)
-                null -> Unit
+                // The backup screen shows these until the user closes them.
+                is OperationResult.BackupExported, is OperationResult.BackupImported, null -> Unit
             }
         }
     }
@@ -88,6 +94,15 @@ fun TaskNudgeApp(
     fun fromOwner(action: () -> Unit) { if (sessionId == owner) action() }
     fun navigateFromOwner(destination: Route) = fromOwner { navigate(destination) }
     BackHandler(enabled = route != Route.TaskList) { navigateFromOwner(shownRoute.back) }
+    // The picker returns to whichever session is showing the backup screen then.
+    val resolver = LocalContext.current.contentResolver
+    val exportContract = remember { ActivityResultContracts.CreateDocument(BackupCodec.MIME_TYPE) }
+    val exportLauncher = rememberLauncherForActivityResult(exportContract) { uri ->
+        if (uri != null && route == Route.Backup) vm.exportBackup(ContentBackupDocument(resolver, uri), sessionId)
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null && route == Route.Backup) vm.prepareImport(ContentBackupDocument(resolver, uri), sessionId)
+    }
     Scaffold(
         modifier = Modifier.fillMaxSize().imePadding(),
         contentWindowInsets = WindowInsets.safeDrawing,
@@ -126,6 +141,17 @@ fun TaskNudgeApp(
                                 onEnableNotifications = { fromOwner(onEnableNotifications) },
                                 onSave = { start, end, interval -> vm.saveSettings(start, end, interval, owner) },
                                 onEnableExactAlarm = { fromOwner(onEnableExactAlarm) },
+                                onOpenBackup = { navigateFromOwner(Route.Backup) },
+                            ),
+                        )
+                        screen == Route.Backup -> BackupScreen(
+                            BackupContent(state.operation.state, snapshot.tasks.size),
+                            BackupActions(
+                                onExport = { fromOwner { exportLauncher.launch(backupFileName(now, zone)) } },
+                                onImport = { fromOwner { importLauncher.launch(backupMimeTypes) } },
+                                onConfirmImport = { vm.confirmImport(owner) },
+                                onCancelImport = { vm.cancelImport(owner) },
+                                onDismissResult = { vm.dismissBackupResult(owner) },
                             ),
                         )
                         screen is Route.Detail && task != null -> TaskDetailScreen(task, state.canSubmit, now, zone, TaskDetailActions(
@@ -154,14 +180,19 @@ fun TaskNudgeApp(
     }
 }
 
-private fun taskViewModelFactory(repository: TaskRepository) = object : ViewModelProvider.Factory {
+private fun backupFileName(now: Instant, zone: ZoneId) = "task-nudge-${now.atZone(zone).toLocalDate()}.json"
+
+// Some providers label JSON as plain text or binary; the content is validated either way.
+private val backupMimeTypes = arrayOf(BackupCodec.MIME_TYPE, "text/plain", "application/octet-stream")
+
+private fun taskViewModelFactory(repository: TaskRepository, clock: Clock) = object : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T = TaskViewModel(repository) as T
+    override fun <T : ViewModel> create(modelClass: Class<T>): T = TaskViewModel(repository, clock) as T
 }
 
 @Composable
-private fun rememberTaskViewModel(repository: TaskRepository): TaskViewModel =
-    viewModel(factory = remember(repository) { taskViewModelFactory(repository) })
+private fun rememberTaskViewModel(repository: TaskRepository, clock: Clock): TaskViewModel =
+    viewModel(factory = remember(repository, clock) { taskViewModelFactory(repository, clock) })
 
 /** The current time, refreshed every 30 seconds while the app is visible, so statuses such as "今日完了" stay current. */
 @Composable
