@@ -19,3 +19,17 @@ subprojects {
         baseline = file("detekt-baseline.xml")
     }
 }
+
+// Kover attaches its agent to every test task by default. Measure only with `-Pcoverage`, so
+// scripts/check.sh and CI run the unit tests exactly as before.
+subprojects {
+    plugins.withId("org.jetbrains.kotlinx.kover") {
+        extensions.configure<kotlinx.kover.gradle.plugin.dsl.KoverProjectExtension> {
+            currentProject {
+                instrumentation {
+                    disabledForAll.set(!providers.gradleProperty("coverage").isPresent)
+                }
+            }
+        }
+    }
+}

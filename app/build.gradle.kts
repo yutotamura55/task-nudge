@@ -63,13 +63,13 @@ kapt {
     }
 }
 
-// Coverage of the JVM unit tests (`koverHtmlReportDebug`). Instrumentation tests are not measured.
+// Coverage of the JVM unit tests (`-Pcoverage koverHtmlReportDebug`). Instrumentation tests are not measured.
 kover {
     reports {
         filters {
             excludes {
                 // Room generates these from TaskDao and TaskDatabase; they are not code we write.
-                classes("*_Impl", "*_Impl$*")
+                classes("dev.tasknudge.data.*_Impl", "dev.tasknudge.data.*_Impl$*")
             }
         }
     }

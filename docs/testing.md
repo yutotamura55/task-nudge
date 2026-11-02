@@ -71,16 +71,20 @@ detekt の版：1.23.8 は Kotlin 2.0.21 向けに作られた安定版ですが
 2.0.0 は alpha 版で、最新の alpha.6 は Kotlin 2.4・AGP 9 向けのため採用していません。
 Kotlin を上げて detekt が解析に失敗したら、その時点の detekt の版と[互換表](https://detekt.dev/docs/introduction/compatibility/)を確かめます。
 
-## テストが通る行の割合（カバレッジ）を測る
+## 単体テストで動いた行の割合（カバレッジ）を測る
 
 単体テストを実行したときに、アプリのコードのどの行が実際に動いたかを測ります。
+テストが成功したかどうかとは別の数値です。
 この割合をカバレッジ（code coverage、テストカバレッジ、日本語では網羅率）と呼びます。
 測るのは Kover 0.9.11（JetBrains が提供する Kotlin 向けの計測ツール）です。
-`scripts/check.sh` と CI には含めていないので、確かめたいときに手で実行します。
+`scripts/check.sh` と CI では測らないので、確かめたいときに `-Pcoverage` を付けて手で実行します。
 
 ```bash
-scripts/container-check.sh ./gradlew --no-daemon --max-workers=1 :core:koverHtmlReport :app:koverHtmlReportDebug
+scripts/container-check.sh ./gradlew --no-daemon --max-workers=1 -Pcoverage :core:koverHtmlReport :app:koverHtmlReportDebug
 ```
+
+`-Pcoverage` がないと、Kover はテストに計測の仕組みを付けないので、レポートは空（0%）になります。
+Kover は、既定ではすべてのテストの実行に計測の仕組みを付けます。`scripts/check.sh` と CI のテストを導入前と同じ条件で動かすため、`build.gradle.kts` で `-Pcoverage` のときだけ付けるようにしています。
 
 ホストに JDK と SDK がある場合は、`scripts/container-check.sh` を外して `./gradlew` から実行できます。
 単体テストも一緒に実行されます。
@@ -96,7 +100,7 @@ scripts/container-check.sh ./gradlew --no-daemon --max-workers=1 :core:koverHtml
 
 - **端末テストの分は含みません。**
   Kover が測るのは JVM で動く単体テスト（`:core:test`、`:app:testDebugUnitTest`）だけです。
-  画面（Compose）の大部分と通知の操作は端末テストで確かめているので、`app` の画面のファイルは 0% 近くに見えます。
+  画面（Compose）の大部分と通知の「完了」「保留」の操作は端末テスト（`TaskScreensTest`、`ScreenshotTest`、`ReminderSmokeTest`）で確かめているので、`app` の画面のファイルは 0% 近くに見えます。
 - **`core` の数値は `core` のテストだけで測ります。**
   `app` のテストが `core` の関数を呼んでも、`core` の割合には入りません。
 - **Room が生成するクラス（`TaskDao_Impl` など）は除いています。**

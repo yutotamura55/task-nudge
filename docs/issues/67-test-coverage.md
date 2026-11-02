@@ -8,7 +8,8 @@
 
 ## 計測の方法
 
-Kover 0.9.11 を `core` と `app` に入れた。手順は [検証ガイド](../testing.md) の「テストが通る行の割合（カバレッジ）を測る」にある。
+Kover 0.9.11 を `core` と `app` に入れた。手順は [検証ガイド](../testing.md) の「単体テストで動いた行の割合（カバレッジ）を測る」にある。
+Kover は既定ではすべてのテストの実行に計測の仕組みを付けるので、`-Pcoverage` を付けたときだけ測るようにした。`scripts/check.sh` と CI のテストは導入前と同じ条件で動く。
 Kover を選んだのは、Kotlin と Android のビルドバリアントにそのまま対応し、AGP の設定を変えずに入れられるためである。
 AGP に組み込まれた JaCoCo は端末テストも測れるが、エミュレーターか実機が要り、この PR の範囲（単体テストの計測）では使わない。
 
@@ -29,6 +30,7 @@ AGP に組み込まれた JaCoCo は端末テストも測れるが、エミュ�
 
 画面の低い数値は、テストがないことを意味しない。
 画面は端末テスト（`TaskScreensTest` 37件、`ScreenshotTest` 7件）で操作しているが、Kover はその分を測らない。
+「Android の入口」のうち、通知の「完了」「保留」を受け取る `ReminderActionReceiver` も、端末テスト（`ReminderSmokeTest` 4件）が通知のボタンを押して動かしている。
 Room の生成コード（`TaskDao_Impl.java` と `TaskDatabase_Impl.java`、557 行）を含めると、`app` の行は 63.9% になる。手で書いたコードではないので除いた。
 
 ## テストが薄い箇所
@@ -42,14 +44,14 @@ Room の生成コード（`TaskDao_Impl.java` と `TaskDatabase_Impl.java`、557
 | `ReminderAlarmReceiver`、`ReminderBootReceiver`、`ReminderWorker` | スリープ中のアラームと定期実行から通知の判断を呼ぶ処理、失敗時に予約し直す・再試行する処理、再起動や時計の変更の後に定期実行を登録し直す処理 | なし | 判断の中身（`ReminderEngine`）は試しているが、OS から呼ばれる入口は手動確認だけ |
 | `AndroidReminderScheduler.kt` 18〜27 行 | WorkManager に定期実行と1回の実行を登録する処理 | なし（`scheduleWhileIdle` だけ単体テストあり） | 登録の名前や重複時の方針（`KEEP`）を変えても検出できない |
 | `ContentBackupDocument`（`BackupDocument.kt`） | 書き出し先を `"wt"` で開けない保存先で `"w"` に切り替える処理、読み込み・削除 | なし（テストは偽の実装を使う） | 一部の保存先での書き出しの失敗を検出できない |
-| `BackupCodec.kt` 184 行 | 読み込み中の `IOException` などを「形式が壊れている」に変える処理 | なし | 壊れたファイルで想定外の例外が画面まで届く変更を検出できない |
 | `TaskViewModel.kt` 227〜236 行 | 読み込みの失敗理由（10 種のうち 8 種）を画面の文に変える処理 | なし | 理由の判定（`BackupCodec`）は試しているが、表示する文の誤りは検出できない |
 
 次の行も動いていないが、影響が小さいので挙げない。
 
 - `CancellationException` を投げ直すだけの `catch`（`TaskViewModel.kt` 44・140・173・212 行）。
+- `BackupCodec.kt` 184 行：読み込み中の例外のうち、分類しないもの（`IOException`・日時の書式・数値の書式などの以外）をそのまま返す処理。そのまま返った例外は `TaskViewModel` の `catch` が「ファイルを開けませんでした」と表示する。`IOException` などを「形式が壊れている」に変える 182〜183 行は、既存のテスト（`BackupCodecTest` の `rejectsInvalidUtf8` など）で動いている。
 - `BackupCodec` の上限付きストリームのうち、1 バイトずつの読み書きと `skip`（192・195・206・207 行）。今の読み込みと書き出しはこの経路を使わない。
-- `core` の 2 行（`TaskInput.kt` 32・46 行）。`bulkTitlesError` の正常な入力と、`validateBulkTaskInput` の省略時の引数で、`app` のテストからは動いている。
+- `core` の 2 行（`TaskInput.kt` 32・46 行）。32 行は `bulkTitlesError` に正しい入力を渡したときの処理で、`core` のテストは誤った入力だけを試しているが、`app` の `TaskViewModel` のテストからは動いている。46 行は `validateBulkTaskInput` の引数 `recurrenceDays` を省略した呼び出しで、テストにもアプリにもこの呼び出しはない。
 
 ## 次に決めること
 
