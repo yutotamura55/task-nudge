@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.kapt)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kover)
 }
 
 android {
@@ -59,6 +60,18 @@ kotlin {
 kapt {
     arguments {
         arg("room.schemaLocation", "$projectDir/schemas")
+    }
+}
+
+// Coverage of the JVM unit tests (`koverHtmlReportDebug`). Instrumentation tests are not measured.
+kover {
+    reports {
+        filters {
+            excludes {
+                // Room generates these from TaskDao and TaskDatabase; they are not code we write.
+                classes("*_Impl", "*_Impl$*")
+            }
+        }
     }
 }
 

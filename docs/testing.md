@@ -71,6 +71,41 @@ detekt の版：1.23.8 は Kotlin 2.0.21 向けに作られた安定版ですが
 2.0.0 は alpha 版で、最新の alpha.6 は Kotlin 2.4・AGP 9 向けのため採用していません。
 Kotlin を上げて detekt が解析に失敗したら、その時点の detekt の版と[互換表](https://detekt.dev/docs/introduction/compatibility/)を確かめます。
 
+## テストが通る行の割合（カバレッジ）を測る
+
+単体テストを実行したときに、アプリのコードのどの行が実際に動いたかを測ります。
+この割合をカバレッジ（code coverage、テストカバレッジ、日本語では網羅率）と呼びます。
+測るのは Kover 0.9.11（JetBrains が提供する Kotlin 向けの計測ツール）です。
+`scripts/check.sh` と CI には含めていないので、確かめたいときに手で実行します。
+
+```bash
+scripts/container-check.sh ./gradlew --no-daemon --max-workers=1 :core:koverHtmlReport :app:koverHtmlReportDebug
+```
+
+ホストに JDK と SDK がある場合は、`scripts/container-check.sh` を外して `./gradlew` から実行できます。
+単体テストも一緒に実行されます。
+結果はモジュールごとにできるので、ブラウザーで開きます。
+
+- `core`：`core/build/reports/kover/html/index.html`
+- `app`：`app/build/reports/kover/htmlDebug/index.html`
+
+行ごとに色が付き、緑は動いた行、赤は一度も動かなかった行、黄色は条件の一部の分岐だけが動いた行です。
+割合だけを見たいときは、タスク名の `koverHtmlReport` を `koverLog` に（`app` は `koverHtmlReportDebug` を `koverLogDebug` に）変えます。
+
+数値を読むときは、次の3点に注意します。
+
+- **端末テストの分は含みません。**
+  Kover が測るのは JVM で動く単体テスト（`:core:test`、`:app:testDebugUnitTest`）だけです。
+  画面（Compose）の大部分と通知の操作は端末テストで確かめているので、`app` の画面のファイルは 0% 近くに見えます。
+- **`core` の数値は `core` のテストだけで測ります。**
+  `app` のテストが `core` の関数を呼んでも、`core` の割合には入りません。
+- **Room が生成するクラス（`TaskDao_Impl` など）は除いています。**
+  手で書いたコードではないためです。設定は `app/build.gradle.kts` の `kover` にあります。
+
+割合を上げること自体は目的にしません。
+赤い行が、壊れると利用者に影響する処理（通知、データの保存や読み込み）かどうかを見て、テストを足すかを決めます。
+Issue #67 で測った結果と、テストが薄い箇所は [docs/issues/67-test-coverage.md](issues/67-test-coverage.md) にあります。
+
 ## 端末・エミュレーター
 
 Android 8.0（API 26）以上の**専用テスト端末またはエミュレーター**を 1 台 `adb devices` で `device` と表示させ、`scripts/device-smoke.sh` を実行します。このスクリプトは接続台数を検査し、`connectedDebugAndroidTest` で debug APK とテスト APK をインストールして全 instrumentation テストを走らせます。このテスト構成は終了後に対象アプリとテスト APK をアンインストールするため、既存の記録がある端末では実行しないでください。画面画像は `build/device-screenshots/` に取得します。テスト結果は `app/build/outputs/androidTest-results/connected/` と `app/build/reports/androidTests/connected/` を確認します。

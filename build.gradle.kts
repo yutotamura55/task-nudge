@@ -7,6 +7,7 @@ plugins {
     alias(libs.plugins.kotlin.kapt) apply false
     alias(libs.plugins.kotlin.compose) apply false
     alias(libs.plugins.detekt) apply false
+    alias(libs.plugins.kover) apply false
 }
 
 // Findings already in a module's baseline pass; any new finding fails `detekt`.
