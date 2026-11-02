@@ -415,6 +415,75 @@ class ReminderEngineTest {
         assertEquals(before, repo.exportBackup())
         assertEquals(requests, scheduler.requests)
     }
+    // Issue #9: at most 40 reminders stay visible. The oldest is removed before the next is
+    // posted, and its removal does not count as a snooze.
+    @Test fun reminderAtTheVisibleLimitReplacesOnlyTheOldest() = runTest {
+        postRemindersEvery15Minutes(40)
+        val before = db.dao().activeReminders()
+        val oldest = before.first()
+        engine.evaluate()
+        val after = db.dao().activeReminders()
+        val newest = after.last()
+        assertEquals(40, after.size)
+        assertEquals(before.drop(1), after.dropLast(1))
+        assertEquals(after.associate { it.notificationId to it.token }, gateway.activeTokens())
+        assertEquals(
+            listOf("cancel ${oldest.notificationId}", "post ${newest.notificationId}"),
+            gateway.calls.takeLast(2),
+        )
+        assertEquals(1, gateway.cancels)
+        val tasks = repo.snapshots.first().tasks
+        assertTrue(tasks.all { it.snoozedUntil == null && it.completions.isEmpty() })
+    }
+    @Test fun reminderBelowTheVisibleLimitKeepsEveryVisibleReminder() = runTest {
+        postRemindersEvery15Minutes(39)
+        val before = db.dao().activeReminders()
+        engine.evaluate()
+        val after = db.dao().activeReminders()
+        assertEquals(40, after.size)
+        assertEquals(before, after.dropLast(1))
+        assertEquals(after.associate { it.notificationId to it.token }, gateway.activeTokens())
+        assertEquals(0, gateway.cancels)
+    }
+    // The OS can change between the reconcile read and the removal at the limit, for example
+    // when the user swipes the oldest notification away. Only a notification still showing the
+    // oldest reminder's token is cancelled.
+    @Test fun oldestReminderSwipedAfterReconcileIsNotCancelledAgain() = runTest {
+        assertOldestChangedAfterReconcile(replacement = null)
+    }
+    @Test fun oldestReminderReplacedAfterReconcileKeepsTheOtherNotification() = runTest {
+        assertOldestChangedAfterReconcile(replacement = "other")
+    }
+    /** [replacement] is the token the OS shows instead of the oldest reminder's; null removes it. */
+    private suspend fun assertOldestChangedAfterReconcile(replacement: String?) {
+        postRemindersEvery15Minutes(40)
+        val oldest = db.dao().activeReminders().first()
+        val reconcileRead = gateway.reads + 1
+        gateway.onRead = { read ->
+            if (read == reconcileRead + 1) {
+                if (replacement == null) remove(oldest.notificationId) else put(oldest.notificationId, replacement)
+            }
+        }
+        engine.evaluate()
+        val after = db.dao().activeReminders()
+        assertEquals(40, after.size)
+        assertTrue(after.none { it.notificationId == oldest.notificationId })
+        assertEquals(0, gateway.cancels)
+        assertEquals(41, gateway.posts)
+        assertEquals(replacement, gateway.activeTokens()[oldest.notificationId])
+    }
+    /** Posts [count] reminders for two tasks, 15 minutes apart. 40 of them end the same day in Tokyo. */
+    private suspend fun postRemindersEvery15Minutes(count: Int) {
+        repo.saveSettings(ReminderSettings(0, 24, 15))
+        repo.saveTask(null, "首"); repo.saveTask(null, "腕")
+        repeat(count) {
+            engine.evaluate()
+            clock.advance(Duration.ofMinutes(15))
+        }
+        assertEquals(count, db.dao().activeReminders().size)
+        assertEquals(count, gateway.activeCount)
+        assertEquals(0, gateway.cancels)
+    }
     private suspend fun reserve(id: Long, token: String, delivered: Boolean) {
         db.dao().insertActiveReminder(ActiveReminderEntity(taskId = id, token = token, localDate = "2026-10-01", preparedAt = clock.millis(), deliveredAt = if (delivered) clock.millis() else null))
         if (delivered) db.dao().saveState(ReminderStateEntity(lastNotifiedAt = clock.millis()))
@@ -442,15 +511,23 @@ private class FakeGateway : NotificationGateway {
     var failReadOnCall: Int? = null
     var reads = 0
     var failCancel = false
+    /** Changes what the OS shows just before the given read returns. */
+    var onRead: (MutableMap<Int, String>.(read: Int) -> Unit)? = null
+    /** Posts and cancels in call order, for example "cancel 1" then "post 41". */
+    val calls = mutableListOf<String>()
     override fun activeTokens(): Map<Int, String> {
         reads++
         if (reads == failReadOnCall) error("notification read")
+        onRead?.invoke(visible, reads)
         return visible.toMap()
     }
     override fun post(notificationId: Int, taskId: Long, token: String, title: String) {
         failure?.let { throw it }; posts++; visible[notificationId] = token; this.taskId = taskId; this.title = title
+        calls += "post $notificationId"
     }
-    override fun cancel(notificationId: Int) { if (failCancel) error("cancel"); cancels++; visible.remove(notificationId) }
+    override fun cancel(notificationId: Int) {
+        if (failCancel) error("cancel"); cancels++; visible.remove(notificationId); calls += "cancel $notificationId"
+    }
 }
 private class FakeScheduler : ReminderScheduler {
     var requests = 0

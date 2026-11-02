@@ -46,6 +46,8 @@ Room の生成コード（`TaskDao_Impl.java` と `TaskDatabase_Impl.java`、557
 | `ContentBackupDocument`（`BackupDocument.kt`） | 書き出し先を `"wt"` で開けない保存先で `"w"` に切り替える処理、読み込み・削除 | なし（テストは偽の実装を使う） | 一部の保存先での書き出しの失敗を検出できない |
 | `TaskViewModel.kt` 227〜236 行 | 読み込みの失敗理由（10 種のうち 8 種）を画面の文に変える処理 | なし | 理由の判定（`BackupCodec`）は試しているが、表示する文の誤りは検出できない |
 
+表は 2026-11-03 の計測時点のものである。`ReminderEngine.kt` 147〜150 行には、その後 Issue #69 で単体テストを足した（`ReminderEngineTest` の `reminderAtTheVisibleLimitReplacesOnlyTheOldest` など）。
+
 次の行も動いていないが、影響が小さいので挙げない。
 
 - `CancellationException` を投げ直すだけの `catch`（`TaskViewModel.kt` 44・140・173・212 行）。
