@@ -66,5 +66,50 @@ class TaskPresentationTest {
         assertEquals("実行できます", taskStatus(task.copy(snoozedUntil = now), now, zone))
         assertTrue(taskCanComplete(task.copy(snoozedUntil = now.plusSeconds(3600)), now, zone))
     }
+    // Each sort test expects an order that differs from the order the tasks are listed in,
+    // so a sort that leaves the list as it is fails.
+    @Test fun registrationOrderUsesCreationTimeThenId() {
+        val tasks = listOf(
+            task.copy(id = 1, createdAt = at(1)),
+            task.copy(id = 2, createdAt = at(1)),
+            task.copy(id = 3, createdAt = at(0)),
+        )
+        assertEquals(listOf(3L, 1L, 2L), sortTasks(tasks, TaskSortOrder.REGISTERED).map { it.id })
+    }
+    @Test fun recurrenceSortComparesHourlyAndDailyIntervalsAsDurations() {
+        val tasks = listOf(
+            task.copy(id = 1, createdAt = at(0), recurrenceDays = 2),
+            task.copy(id = 2, createdAt = at(1), recurrenceHours = 23),
+            task.copy(id = 3, createdAt = at(2), recurrenceDays = 1),
+            task.copy(id = 4, createdAt = at(3), recurrenceHours = 1),
+            task.copy(id = 5, createdAt = at(4), recurrenceHours = 24),
+        )
+        // 24 hours and 1 day tie, so registration order decides between tasks 3 and 5.
+        val shortestFirst = sortTasks(tasks, TaskSortOrder.RECURRENCE_SHORTEST)
+        assertEquals(listOf(4L, 2L, 3L, 5L, 1L), shortestFirst.map { it.id })
+    }
+    @Test fun newestRegistrationComesFirst() {
+        val tasks = listOf(
+            task.copy(id = 1, createdAt = at(0)),
+            task.copy(id = 2, createdAt = at(1)),
+            task.copy(id = 3, createdAt = at(1)),
+        )
+        val newestFirst = sortTasks(tasks, TaskSortOrder.REGISTERED_NEWEST)
+        assertEquals(listOf(3L, 2L, 1L), newestFirst.map { it.id })
+    }
+    @Test fun completionCountSortPutsTheMostCompletedFirstAndKeepsRegistrationOrderForTies() {
+        val tasks = listOf(
+            task.copy(id = 1, createdAt = at(0), completions = listOf(record("2026-09-30"))),
+            task.copy(id = 2, createdAt = at(1), completions = listOf(record("2026-09-29"), record("2026-09-30"))),
+            task.copy(id = 3, createdAt = at(2), completions = listOf(record("2026-09-30"))),
+            task.copy(id = 4, createdAt = at(3), completions = emptyList()),
+        )
+        assertEquals(listOf(2L, 1L, 3L, 4L), sortTasks(tasks, TaskSortOrder.COMPLETIONS_MOST).map { it.id })
+    }
+    @Test fun sortMenuStartsWithRegistrationOrder() {
+        assertEquals(TaskSortOrder.REGISTERED, TaskSortOrder.entries.first())
+        assertEquals("登録順", TaskSortOrder.REGISTERED.label)
+    }
+    private fun at(seconds: Long) = Instant.EPOCH.plusSeconds(seconds)
     private fun record(day: String) = CompletionRecord(1, Instant.EPOCH, LocalDate.parse(day))
 }

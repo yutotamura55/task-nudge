@@ -34,6 +34,7 @@ data class TaskListContent(
     val canSubmit: Boolean,
     val now: Instant,
     val zone: ZoneId,
+    val sortOrder: TaskSortOrder,
 )
 
 class TaskListActions(
@@ -42,13 +43,14 @@ class TaskListActions(
     val onEnableNotifications: () -> Unit,
     val onOpenTask: (Long) -> Unit,
     val onComplete: (Long) -> Unit,
+    val onSortOrderChange: (TaskSortOrder) -> Unit,
 )
 
 @Composable
 fun TaskListScreen(content: TaskListContent, actions: TaskListActions) {
     val today = content.now.atZone(content.zone).toLocalDate()
     val active = content.tasks.filterNot { it.archived }
-    val visible = visibleTasks(content.tasks, content.showArchived, content.query)
+    val visible = sortTasks(visibleTasks(content.tasks, content.showArchived, content.query), content.sortOrder)
     var searchExpanded by rememberSaveable { mutableStateOf(content.query.isNotEmpty()) }
     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
@@ -70,6 +72,7 @@ fun TaskListScreen(content: TaskListContent, actions: TaskListActions) {
                 }
             }
         }
+        item { SortMenu(content.sortOrder, actions.onSortOrderChange) }
         if (searchExpanded) item {
             Column {
                 OutlinedTextField(
@@ -94,6 +97,25 @@ fun TaskListScreen(content: TaskListContent, actions: TaskListActions) {
             TaskRow(task, content.canSubmit, content.now, content.zone, onOpen = { actions.onOpenTask(task.id) }, onComplete = { actions.onComplete(task.id) })
         }
         item { Spacer(Modifier.height(80.dp)) }
+    }
+}
+
+/** Shows the current order; tapping it lists every order to choose from. */
+@Composable
+private fun SortMenu(order: TaskSortOrder, onChange: (TaskSortOrder) -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { expanded = true }, modifier = Modifier.heightIn(min = 48.dp)) {
+            Text("並び替え：${order.label}")
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            TaskSortOrder.entries.forEach { option ->
+                DropdownMenuItem(text = { Text(option.label) }, onClick = {
+                    expanded = false
+                    onChange(option)
+                })
+            }
+        }
     }
 }
 
@@ -153,8 +175,10 @@ private fun TaskListPreview() {
     TaskNudgeTheme(dynamicColor = false) {
         Surface { TaskListScreen(
             TaskListContent(tasks = emptyList(), showArchived = false, query = "", notificationsEnabled = false,
-                permissionRequested = false, canSubmit = true, now = Instant.now(), zone = ZoneId.systemDefault()),
-            TaskListActions(onShowArchived = {}, onQueryChange = {}, onEnableNotifications = {}, onOpenTask = {}, onComplete = {}),
+                permissionRequested = false, canSubmit = true, now = Instant.now(), zone = ZoneId.systemDefault(),
+                sortOrder = TaskSortOrder.REGISTERED),
+            TaskListActions(onShowArchived = {}, onQueryChange = {}, onEnableNotifications = {}, onOpenTask = {},
+                onComplete = {}, onSortOrderChange = {}),
         ) }
     }
 }

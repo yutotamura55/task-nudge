@@ -68,6 +68,9 @@ class TaskScreensTest {
         compose.onNodeWithText("追加予定：${value.lines().count { it.isNotBlank() }}件").assertExists()
     }
     private fun dismissKeyboard() = compose.closeKeyboard()
+    /** Lists [titles] from the top of the screen down. */
+    private fun titlesFromTop(vararg titles: String) =
+        titles.sortedBy { compose.onNodeWithText(it).fetchSemanticsNode().positionInRoot.y }
     private fun launchEdgeToEdge(repo: ScreenRepository) {
         compose.runOnUiThread {
             val activity = ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).first()
@@ -208,6 +211,22 @@ class TaskScreensTest {
         compose.onNodeWithText("タスクを検索").performTextClearance()
         dismissKeyboard()
         compose.onNodeWithText("首のストレッチ").assertIsDisplayed()
+    }
+    @Test fun sortingByCompletionCountReordersTasksAndKeepsTheOrderAfterOpeningDetail() {
+        val repo = ScreenRepository(listOf(
+            sampleTask().copy(id = 1, title = "首"),
+            sampleTask().copy(id = 2, title = "肩", completions = completions(3)),
+            sampleTask().copy(id = 3, title = "腕", completions = emptyList()),
+        ))
+        launch(repo)
+        assertEquals(listOf("首", "肩", "腕"), titlesFromTop("首", "肩", "腕"))
+        compose.onNodeWithText("並び替え：登録順").performClick()
+        compose.onNodeWithText("完了回数が多い順").performClick()
+        assertEquals(listOf("肩", "首", "腕"), titlesFromTop("首", "肩", "腕"))
+        compose.onNodeWithText("肩").performClick()
+        compose.onNodeWithContentDescription("戻る").performClick()
+        compose.onNodeWithText("並び替え：完了回数が多い順").assertIsDisplayed()
+        assertEquals(listOf("肩", "首", "腕"), titlesFromTop("首", "肩", "腕"))
     }
     @Test fun largeTextKeepsTaskNameReadableWithCompletionAction() {
         val title = "首と肩のストレッチをゆっくり丁寧に続ける"
@@ -752,9 +771,16 @@ class TaskScreensTest {
 private fun listContent(tasks: List<TaskSnapshot>) = TaskListContent(
     tasks = tasks, showArchived = false, query = "", notificationsEnabled = true, permissionRequested = false,
     canSubmit = true, now = Instant.parse("2026-10-01T10:00:00Z"), zone = ZoneId.of("Asia/Tokyo"),
+    sortOrder = TaskSortOrder.REGISTERED,
 )
-private fun listActions(onOpenTask: (Long) -> Unit = {}) =
-    TaskListActions(onShowArchived = {}, onQueryChange = {}, onEnableNotifications = {}, onOpenTask = onOpenTask, onComplete = {})
+private fun listActions(onOpenTask: (Long) -> Unit = {}) = TaskListActions(
+    onShowArchived = {}, onQueryChange = {}, onEnableNotifications = {}, onOpenTask = onOpenTask, onComplete = {},
+    onSortOrderChange = {},
+)
+private fun completions(count: Int) = List(count) { index ->
+    val day = LocalDate.of(2026, 9, 30).minusDays(index.toLong())
+    CompletionRecord(index + 1L, day.atTime(10, 0).toInstant(java.time.ZoneOffset.UTC), day)
+}
 private fun sampleTask() = TaskSnapshot(1, "首", 1, false, Instant.EPOCH, null, listOf(CompletionRecord(1, Instant.parse("2026-09-30T10:00:00Z"), LocalDate.of(2026, 9, 30))))
 private class ScreenRepository(tasks: List<TaskSnapshot> = emptyList(), private val publishSaves: Boolean = true) : TaskRepository {
     var pendingTask: TaskSnapshot? = null
