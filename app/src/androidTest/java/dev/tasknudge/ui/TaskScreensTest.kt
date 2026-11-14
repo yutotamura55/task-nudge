@@ -221,12 +221,18 @@ class TaskScreensTest {
         launch(repo)
         assertEquals(listOf("首", "肩", "腕"), titlesFromTop("首", "肩", "腕"))
         compose.onNodeWithText("並び替え：登録順").performClick()
-        compose.onNodeWithText("完了回数が多い順").performClick()
+        compose.onNodeWithText("登録順").assertIsSelected()
+        compose.onNodeWithText("完了回数が多い順").assertIsNotSelected().performClick()
         assertEquals(listOf("肩", "首", "腕"), titlesFromTop("首", "肩", "腕"))
         compose.onNodeWithText("肩").performClick()
         compose.onNodeWithContentDescription("戻る").performClick()
         compose.onNodeWithText("並び替え：完了回数が多い順").assertIsDisplayed()
         assertEquals(listOf("肩", "首", "腕"), titlesFromTop("首", "肩", "腕"))
+    }
+    @Test fun sortMenuIsHiddenWhileThereAreNoTasks() {
+        compose.setContent { TaskNudgeTheme(dynamicColor = false) { TaskListScreen(listContent(emptyList()), listActions()) } }
+        compose.onNodeWithText("まだタスクがありません", substring = true).assertIsDisplayed()
+        compose.onNodeWithText("並び替え：登録順").assertDoesNotExist()
     }
     @Test fun largeTextKeepsTaskNameReadableWithCompletionAction() {
         val title = "首と肩のストレッチをゆっくり丁寧に続ける"

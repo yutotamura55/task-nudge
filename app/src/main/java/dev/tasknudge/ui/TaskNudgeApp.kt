@@ -61,7 +61,7 @@ fun TaskNudgeApp(
     }
     var showArchived by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
-    var sortOrder by rememberSaveable { mutableStateOf(TaskSortOrder.REGISTERED) }
+    var sortOrder by rememberSaveable(stateSaver = TaskSortOrder.saver) { mutableStateOf(TaskSortOrder.REGISTERED) }
     val now = rememberNow(clock)
     val zone = zoneProvider()
     LaunchedEffect(initialTaskId) {

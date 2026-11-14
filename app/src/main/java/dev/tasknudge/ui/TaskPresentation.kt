@@ -1,5 +1,6 @@
 package dev.tasknudge.ui
 
+import androidx.compose.runtime.saveable.Saver
 import dev.tasknudge.data.TaskSnapshot
 import dev.tasknudge.data.reminderTask
 import java.time.Duration
@@ -41,6 +42,15 @@ enum class TaskSortOrder(val label: String) {
     RECURRENCE_SHORTEST("繰り返しの間隔が短い順"),
     REGISTERED_NEWEST("登録日時が新しい順"),
     COMPLETIONS_MOST("完了回数が多い順"),
+    ;
+
+    companion object {
+        /** Saves the name, so a renamed or removed order restores as registration order. */
+        val saver: Saver<TaskSortOrder, String> = Saver(
+            save = { it.name },
+            restore = { name -> entries.firstOrNull { it.name == name } ?: REGISTERED },
+        )
+    }
 }
 
 private val registrationOrder = compareBy<TaskSnapshot>({ it.createdAt }, { it.id })

@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.ImeAction
@@ -72,7 +73,7 @@ fun TaskListScreen(content: TaskListContent, actions: TaskListActions) {
                 }
             }
         }
-        item { SortMenu(content.sortOrder, actions.onSortOrderChange) }
+        if (content.tasks.isNotEmpty()) item { SortMenu(content.sortOrder, actions.onSortOrderChange) }
         if (searchExpanded) item {
             Column {
                 OutlinedTextField(
@@ -94,7 +95,13 @@ fun TaskListScreen(content: TaskListContent, actions: TaskListActions) {
             }, style = MaterialTheme.typography.bodyLarge)
         }
         items(visible, key = { it.id }) { task ->
-            TaskRow(task, content.canSubmit, content.now, content.zone, onOpen = { actions.onOpenTask(task.id) }, onComplete = { actions.onComplete(task.id) })
+            // Completing a task can move it under the completion-count order; the animation shows where it went.
+            Box(Modifier.animateItem()) {
+                TaskRow(
+                    task, content.canSubmit, content.now, content.zone,
+                    onOpen = { actions.onOpenTask(task.id) }, onComplete = { actions.onComplete(task.id) },
+                )
+            }
         }
         item { Spacer(Modifier.height(80.dp)) }
     }
@@ -110,10 +117,14 @@ private fun SortMenu(order: TaskSortOrder, onChange: (TaskSortOrder) -> Unit) {
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             TaskSortOrder.entries.forEach { option ->
-                DropdownMenuItem(text = { Text(option.label) }, onClick = {
-                    expanded = false
-                    onChange(option)
-                })
+                DropdownMenuItem(
+                    text = { Text(option.label) },
+                    onClick = {
+                        expanded = false
+                        onChange(option)
+                    },
+                    modifier = Modifier.semantics { selected = option == order },
+                )
             }
         }
     }

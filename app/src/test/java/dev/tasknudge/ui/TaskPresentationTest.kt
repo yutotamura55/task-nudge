@@ -110,6 +110,10 @@ class TaskPresentationTest {
         assertEquals(TaskSortOrder.REGISTERED, TaskSortOrder.entries.first())
         assertEquals("登録順", TaskSortOrder.REGISTERED.label)
     }
+    @Test fun savedSortOrderRestoresByNameAndFallsBackToRegistrationOrder() {
+        assertEquals(TaskSortOrder.COMPLETIONS_MOST, TaskSortOrder.saver.restore("COMPLETIONS_MOST"))
+        assertEquals(TaskSortOrder.REGISTERED, TaskSortOrder.saver.restore("REMOVED_ORDER"))
+    }
     private fun at(seconds: Long) = Instant.EPOCH.plusSeconds(seconds)
     private fun record(day: String) = CompletionRecord(1, Instant.EPOCH, LocalDate.parse(day))
 }
