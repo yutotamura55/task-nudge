@@ -46,6 +46,28 @@ class TaskPresentationTest {
         assertEquals(listOf(1L), visibleTasks(tasks, false, "ストレッチ").map { it.id })
         assertEquals(listOf(1L, 2L), visibleTasks(tasks, true, "ストレッチ").map { it.id })
     }
+    @Test fun defaultSortKeepsTheExistingOrder() {
+        val tasks = listOf(task.copy(id = 2), task.copy(id = 1))
+        assertEquals(listOf(2L, 1L), sortTasks(tasks, TaskSortOrder.DEFAULT).map { it.id })
+    }
+    @Test fun intervalSortComparesHourlyAndDailyRecurrencesInHours() {
+        val tasks = listOf(
+            task.copy(id = 1, recurrenceDays = 2),
+            task.copy(id = 2, recurrenceHours = 1),
+            task.copy(id = 3, recurrenceDays = 1),
+        )
+        assertEquals(listOf(2L, 3L, 1L), sortTasks(tasks, TaskSortOrder.INTERVAL_ASCENDING).map { it.id })
+    }
+    @Test fun createdAndCompletionSortsUseNewestAndHighestFirst() {
+        val older = task.copy(id = 1, createdAt = Instant.EPOCH, completions = listOf(record("2026-09-30")))
+        val newer = task.copy(id = 2, createdAt = Instant.EPOCH.plusSeconds(1), completions = listOf(record("2026-09-30"), record("2026-10-01")))
+        assertEquals(listOf(2L, 1L), sortTasks(listOf(older, newer), TaskSortOrder.CREATED_NEWEST).map { it.id })
+        assertEquals(listOf(2L, 1L), sortTasks(listOf(older, newer), TaskSortOrder.COMPLETIONS_DESCENDING).map { it.id })
+    }
+    @Test fun titleSortIsCaseInsensitiveAndUsesIdToBreakTies() {
+        val tasks = listOf(task.copy(id = 3, title = "b"), task.copy(id = 2, title = "A"), task.copy(id = 1, title = "a"))
+        assertEquals(listOf(1L, 2L, 3L), sortTasks(tasks, TaskSortOrder.TITLE_ASCENDING).map { it.id })
+    }
     @Test fun dailyTaskCanBeCompletedOnTheNextDateBeforeItsRecurrenceIsDue() {
         val yesterday = task.copy(completions = listOf(record("2026-09-30")))
         assertTrue(taskCanComplete(yesterday, now, zone))

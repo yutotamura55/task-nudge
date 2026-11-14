@@ -177,6 +177,25 @@ class TaskScreensTest {
         compose.onNodeWithText("腰").assertIsDisplayed().performClick()
         compose.runOnIdle { assertEquals(4L, openedTask) }
     }
+    @Test fun taskListCanBeSortedByCompletionCount() {
+        val tasks = listOf(
+            sampleTask().copy(id = 1, title = "首"),
+            sampleTask().copy(id = 2, title = "肩", completions = List(3) { sampleTask().completions.single() }),
+        )
+        var sortOrder by mutableStateOf(TaskSortOrder.DEFAULT)
+        compose.setContent {
+            TaskNudgeTheme(dynamicColor = false) {
+                Box(Modifier.size(360.dp, 560.dp)) {
+                    TaskListScreen(listContent(tasks).copy(sortOrder = sortOrder), listActions(onSortOrderChange = { sortOrder = it }))
+                }
+            }
+        }
+        compose.onNodeWithText("並び替え：登録順").performClick()
+        compose.onNodeWithText("完了回数が多い順").performClick()
+        val shoulderY = compose.onNodeWithText("肩").fetchSemanticsNode().positionInRoot.y
+        val neckY = compose.onNodeWithText("首").fetchSemanticsNode().positionInRoot.y
+        assertTrue("The task with more completions should appear first", shoulderY < neckY)
+    }
     @Test fun searchingTaskTitlesFiltersListAndKeepsQueryAfterOpeningDetail() {
         val repo = ScreenRepository(listOf(
             sampleTask().copy(id = 1, title = "首のストレッチ"),
@@ -753,8 +772,8 @@ private fun listContent(tasks: List<TaskSnapshot>) = TaskListContent(
     tasks = tasks, showArchived = false, query = "", notificationsEnabled = true, permissionRequested = false,
     canSubmit = true, now = Instant.parse("2026-10-01T10:00:00Z"), zone = ZoneId.of("Asia/Tokyo"),
 )
-private fun listActions(onOpenTask: (Long) -> Unit = {}) =
-    TaskListActions(onShowArchived = {}, onQueryChange = {}, onEnableNotifications = {}, onOpenTask = onOpenTask, onComplete = {})
+private fun listActions(onOpenTask: (Long) -> Unit = {}, onSortOrderChange: (TaskSortOrder) -> Unit = {}) =
+    TaskListActions(onShowArchived = {}, onQueryChange = {}, onEnableNotifications = {}, onOpenTask = onOpenTask, onComplete = {}, onSortOrderChange = onSortOrderChange)
 private fun sampleTask() = TaskSnapshot(1, "首", 1, false, Instant.EPOCH, null, listOf(CompletionRecord(1, Instant.parse("2026-09-30T10:00:00Z"), LocalDate.of(2026, 9, 30))))
 private class ScreenRepository(tasks: List<TaskSnapshot> = emptyList(), private val publishSaves: Boolean = true) : TaskRepository {
     var pendingTask: TaskSnapshot? = null

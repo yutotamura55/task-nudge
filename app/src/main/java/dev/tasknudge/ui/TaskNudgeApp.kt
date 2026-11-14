@@ -61,6 +61,7 @@ fun TaskNudgeApp(
     }
     var showArchived by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
+    var taskSortOrder by rememberSaveable { mutableStateOf(TaskSortOrder.DEFAULT) }
     val now = rememberNow(clock)
     val zone = zoneProvider()
     LaunchedEffect(initialTaskId) {
@@ -163,7 +164,7 @@ fun TaskNudgeApp(
                             TaskListContent(
                                 tasks = snapshot.tasks, showArchived = showArchived, query = searchQuery,
                                 notificationsEnabled = notificationsEnabled, permissionRequested = snapshot.permissionRequested,
-                                canSubmit = state.canSubmit, now = now, zone = zone,
+                                canSubmit = state.canSubmit, now = now, zone = zone, sortOrder = taskSortOrder,
                             ),
                             TaskListActions(
                                 onShowArchived = { fromOwner { showArchived = it } },
@@ -171,6 +172,7 @@ fun TaskNudgeApp(
                                 onEnableNotifications = { fromOwner(onEnableNotifications) },
                                 onOpenTask = { navigateFromOwner(Route.Detail(it)) },
                                 onComplete = { vm.completeTask(it, owner) },
+                                onSortOrderChange = { fromOwner { taskSortOrder = it } },
                             ),
                         )
                     }

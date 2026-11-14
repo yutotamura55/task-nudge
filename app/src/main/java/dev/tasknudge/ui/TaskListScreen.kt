@@ -34,6 +34,7 @@ data class TaskListContent(
     val canSubmit: Boolean,
     val now: Instant,
     val zone: ZoneId,
+    val sortOrder: TaskSortOrder = TaskSortOrder.DEFAULT,
 )
 
 class TaskListActions(
@@ -42,14 +43,16 @@ class TaskListActions(
     val onEnableNotifications: () -> Unit,
     val onOpenTask: (Long) -> Unit,
     val onComplete: (Long) -> Unit,
+    val onSortOrderChange: (TaskSortOrder) -> Unit = {},
 )
 
 @Composable
 fun TaskListScreen(content: TaskListContent, actions: TaskListActions) {
     val today = content.now.atZone(content.zone).toLocalDate()
     val active = content.tasks.filterNot { it.archived }
-    val visible = visibleTasks(content.tasks, content.showArchived, content.query)
+    val visible = sortTasks(visibleTasks(content.tasks, content.showArchived, content.query), content.sortOrder)
     var searchExpanded by rememberSaveable { mutableStateOf(content.query.isNotEmpty()) }
+    var sortExpanded by rememberSaveable { mutableStateOf(false) }
     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
             Text("今日の完了 ${active.count { task -> task.completions.any { it.localDate == today } }} / ${active.size}", style = MaterialTheme.typography.titleLarge)
@@ -67,6 +70,24 @@ fun TaskListScreen(content: TaskListContent, actions: TaskListActions) {
                     searchExpanded = !searchExpanded
                 }, modifier = Modifier.heightIn(min = 48.dp)) {
                     Text(if (searchExpanded) "検索を閉じる" else "検索")
+                }
+            }
+        }
+        item {
+            Box {
+                TextButton(onClick = { sortExpanded = true }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text("並び替え：${content.sortOrder.label}")
+                }
+                DropdownMenu(expanded = sortExpanded, onDismissRequest = { sortExpanded = false }) {
+                    TaskSortOrder.entries.forEach { order ->
+                        DropdownMenuItem(
+                            text = { Text(order.label) },
+                            onClick = {
+                                actions.onSortOrderChange(order)
+                                sortExpanded = false
+                            },
+                        )
+                    }
                 }
             }
         }
