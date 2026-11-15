@@ -62,9 +62,9 @@ class RecurrenceWaitEndTest {
         val later = now.plus(Duration.ofHours(30))
         val hourly = ReminderTask(1, created, recurrenceHours = 2, lastCompletedAt = now, snoozedUntil = later)
         assertEquals(now.plus(Duration.ofHours(2)), hourly.recurrenceWaitEnd(now, zone))
+        assertEquals(now.plus(Duration.ofHours(2)), hourly.copy(archived = true).recurrenceWaitEnd(now, zone))
         val daily = ReminderTask(2, created, recurrenceDays = 1, lastCompletedDate = LocalDate.parse("2026-09-29"))
         assertNull(daily.copy(snoozedUntil = later).recurrenceWaitEnd(now, zone))
-        assertNull(daily.copy(archived = true).recurrenceWaitEnd(now, zone))
     }
 
     @Test fun waitEndIsTheFirstInstantAtWhichAnUnsnoozedTaskIsDue() {
