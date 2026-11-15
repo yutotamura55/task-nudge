@@ -128,6 +128,26 @@ class ScreenshotTest {
         }
     }
 
+    @Test fun nextDueSortScreenshotShowsTheChosenOrder() = runBlocking {
+        val repository = app.container.repository
+        val stretch = repository.saveTask(null, "首のストレッチ", 1)
+        val water = repository.saveTask(null, "水を飲む", 1, recurrenceHours = 2)
+        repository.saveTask(null, "肩を回す", 3)
+        repository.completeTask(stretch)
+        repository.completeTask(water)
+        launchMain {
+            waitForAddFabVisible()
+            compose.onNode(hasScrollAction()).performScrollToNode(hasText("並び替え：登録順"))
+            compose.onNodeWithText("並び替え：登録順").performClick()
+            compose.onNodeWithText("次回対象が近い順").performClick()
+            compose.onNodeWithText("並び替え：次回対象が近い順").assertIsDisplayed()
+            // At any time of day, 肩を回す is due now and 水を飲む only in 2 hours, the reverse of registration order.
+            val top = { title: String -> compose.onNodeWithText(title).fetchSemanticsNode().positionInRoot.y }
+            assertTrue("肩を回す should be above 水を飲む", top("肩を回す") < top("水を飲む"))
+            capture("task-sort-next-due")
+        }
+    }
+
     @Test fun fifteenMinuteIntervalPersistsAndRemainsSelectedAfterReopening() {
         launchMain { scenario ->
             waitForAddFabVisible()

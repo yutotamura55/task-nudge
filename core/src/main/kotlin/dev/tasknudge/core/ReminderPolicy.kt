@@ -32,6 +32,23 @@ data class ReminderTask(
 
     fun isDue(now: Instant, today: LocalDate): Boolean =
         !archived && canComplete(now) && (nextDueDate?.let { !today.isBefore(it) } ?: true) && !isSnoozed(now)
+
+    /**
+     * When the wait set by the recurrence ends: [nextCompletableAt] for an hourly task, or the start of the
+     * next due date in [zone] for a daily one. Null when no such wait is left at [now]. Ignores archiving,
+     * snoozes and notification hours. [completedToday] must describe [now]'s date in [zone].
+     */
+    fun recurrenceWaitEnd(now: Instant, zone: ZoneId): Instant? {
+        val end = if (recurrenceHours != null) {
+            nextCompletableAt
+        } else {
+            val tomorrow = now.atZone(zone).toLocalDate().plusDays(1)
+            // A daily task completed today cannot be due again before tomorrow, whatever its latest completion date.
+            val dueDate = if (completedToday) nextDueDate?.takeIf { it.isAfter(tomorrow) } ?: tomorrow else nextDueDate
+            dueDate?.atStartOfDay(zone)?.toInstant()
+        }
+        return end?.takeIf { it.isAfter(now) }
+    }
 }
 
 data class ReminderSettings(

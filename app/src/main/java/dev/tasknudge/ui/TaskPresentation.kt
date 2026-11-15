@@ -42,6 +42,7 @@ enum class TaskSortOrder(val label: String) {
     RECURRENCE_SHORTEST("繰り返しの間隔が短い順"),
     REGISTERED_NEWEST("登録日時が新しい順"),
     COMPLETIONS_MOST("完了回数が多い順"),
+    NEXT_DUE("次回対象が近い順"),
     ;
 
     companion object {
@@ -55,16 +56,34 @@ enum class TaskSortOrder(val label: String) {
 
 private val registrationOrder = compareBy<TaskSnapshot>({ it.createdAt }, { it.id })
 
-/** Sorts [tasks] by [order]. Tasks with the same value stay in registration order. */
-fun sortTasks(tasks: List<TaskSnapshot>, order: TaskSortOrder): List<TaskSnapshot> = tasks.sortedWith(
-    when (order) {
-        TaskSortOrder.REGISTERED -> registrationOrder
-        TaskSortOrder.RECURRENCE_SHORTEST -> compareBy(::recurrenceInterval).then(registrationOrder)
-        TaskSortOrder.REGISTERED_NEWEST -> registrationOrder.reversed()
-        TaskSortOrder.COMPLETIONS_MOST ->
-            compareByDescending<TaskSnapshot> { it.completions.size }.then(registrationOrder)
-    },
-)
+/** Sorts [tasks] by [order] as seen at [now] in [zone]. Tasks with the same value stay in registration order. */
+fun sortTasks(tasks: List<TaskSnapshot>, order: TaskSortOrder, now: Instant, zone: ZoneId): List<TaskSnapshot> =
+    tasks.sortedWith(
+        when (order) {
+            TaskSortOrder.REGISTERED -> registrationOrder
+            TaskSortOrder.RECURRENCE_SHORTEST -> compareBy(::recurrenceInterval).then(registrationOrder)
+            TaskSortOrder.REGISTERED_NEWEST -> registrationOrder.reversed()
+            TaskSortOrder.COMPLETIONS_MOST ->
+                compareByDescending<TaskSnapshot> { it.completions.size }.then(registrationOrder)
+            TaskSortOrder.NEXT_DUE -> nextDueOrder(tasks, now, zone)
+        },
+    )
+
+/** Orders by [shownDueAt], computed once per task rather than on every comparison; stopped tasks come last. */
+private fun nextDueOrder(tasks: List<TaskSnapshot>, now: Instant, zone: ZoneId): Comparator<TaskSnapshot> {
+    val dueAt = tasks.associate { it.id to shownDueAt(it, now, zone) }
+    return compareBy<TaskSnapshot, Instant?>(nullsLast()) { dueAt[it.id] }.then(registrationOrder)
+}
+
+/**
+ * The time [taskStatus] shows, picked in the same order: the recurrence wait, then the snooze, then [now].
+ * A 「今日完了」 row shows no time but waits for its next due date. Null for a stopped task.
+ */
+private fun shownDueAt(task: TaskSnapshot, now: Instant, zone: ZoneId): Instant? {
+    if (task.archived) return null
+    val rules = task.reminderTask(now.atZone(zone).toLocalDate())
+    return rules.recurrenceWaitEnd(now, zone) ?: task.snoozedUntil?.takeIf { rules.isSnoozed(now) } ?: now
+}
 
 /** Compares an hourly recurrence with a daily one by length, so 24 hours equals 1 day. */
 private fun recurrenceInterval(task: TaskSnapshot): Duration =

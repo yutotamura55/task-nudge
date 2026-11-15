@@ -74,7 +74,7 @@ class TaskPresentationTest {
             task.copy(id = 2, createdAt = at(1)),
             task.copy(id = 3, createdAt = at(0)),
         )
-        assertEquals(listOf(3L, 1L, 2L), sortTasks(tasks, TaskSortOrder.REGISTERED).map { it.id })
+        assertEquals(listOf(3L, 1L, 2L), sortTasks(tasks, TaskSortOrder.REGISTERED, now, zone).map { it.id })
     }
     @Test fun recurrenceSortComparesHourlyAndDailyIntervalsAsDurations() {
         val tasks = listOf(
@@ -85,7 +85,7 @@ class TaskPresentationTest {
             task.copy(id = 4, createdAt = at(3), recurrenceHours = 1),
         )
         // 24 hours and 1 day tie, so registration order puts task 3 before task 5.
-        val shortestFirst = sortTasks(tasks, TaskSortOrder.RECURRENCE_SHORTEST)
+        val shortestFirst = sortTasks(tasks, TaskSortOrder.RECURRENCE_SHORTEST, now, zone)
         assertEquals(listOf(4L, 2L, 3L, 5L, 1L), shortestFirst.map { it.id })
     }
     @Test fun newestRegistrationComesFirst() {
@@ -94,7 +94,7 @@ class TaskPresentationTest {
             task.copy(id = 2, createdAt = at(1)),
             task.copy(id = 3, createdAt = at(1)),
         )
-        val newestFirst = sortTasks(tasks, TaskSortOrder.REGISTERED_NEWEST)
+        val newestFirst = sortTasks(tasks, TaskSortOrder.REGISTERED_NEWEST, now, zone)
         assertEquals(listOf(3L, 2L, 1L), newestFirst.map { it.id })
     }
     @Test fun completionCountSortPutsTheMostCompletedFirstAndKeepsRegistrationOrderForTies() {
@@ -104,7 +104,65 @@ class TaskPresentationTest {
             task.copy(id = 1, createdAt = at(0), completions = listOf(record("2026-09-30"))),
             task.copy(id = 4, createdAt = at(3), completions = emptyList()),
         )
-        assertEquals(listOf(2L, 1L, 3L, 4L), sortTasks(tasks, TaskSortOrder.COMPLETIONS_MOST).map { it.id })
+        assertEquals(listOf(2L, 1L, 3L, 4L), sortTasks(tasks, TaskSortOrder.COMPLETIONS_MOST, now, zone).map { it.id })
+    }
+    @Test fun nextDueSortFollowsTheTimesTheRowsShowAndPutsStoppedTasksLast() {
+        // now is 19:00 on 2026-10-01 in Tokyo; the task fixture repeats every 3 days.
+        val hour = Duration.ofHours(1)
+        val today = "2026-10-01"
+        val yesterday = completion(now.minus(Duration.ofDays(1)), "2026-09-30")
+        val anHourAgo = completion(now.minus(hour), today)
+        val tasks = listOf(
+            task.copy(id = 7, createdAt = at(6), archived = true),
+            // Completed today, so it is due on 2026-10-04, after task 5's 2026-10-03.
+            task.copy(id = 6, createdAt = at(5), completions = listOf(completion(now, today))),
+            task.copy(id = 5, createdAt = at(4), completions = listOf(yesterday)),
+            task.copy(id = 4, createdAt = at(3), recurrenceHours = 2, completions = listOf(anHourAgo)),
+            task.copy(id = 3, createdAt = at(2), snoozedUntil = now.plus(hour.multipliedBy(3))),
+            task.copy(id = 2, createdAt = at(1)),
+            task.copy(id = 1, createdAt = at(0)),
+        )
+        val sorted = sortTasks(tasks, TaskSortOrder.NEXT_DUE, now, zone)
+        assertEquals(listOf(1L, 2L, 4L, 3L, 5L, 6L, 7L), sorted.map { it.id })
+        assertEquals(
+            listOf(
+                "実行できます", "実行できます", "次回対象 2026-10-01 20:00", "保留中・2026-10-01 22:00まで",
+                "次回対象日 2026-10-03", "今日完了", "停止中",
+            ),
+            sorted.map { taskStatus(it, now, zone) },
+        )
+    }
+    @Test fun nextDueSortUsesTheWaitTheRowShowsEvenWhenASnoozeEndsLater() {
+        // Editing the recurrence keeps a snooze, so a row can show a wait that ends before the snooze does.
+        val hour = Duration.ofHours(1)
+        val anHourAgo = listOf(completion(now.minus(hour), "2026-10-01"))
+        val yesterday = listOf(completion(now.minus(Duration.ofDays(1)), "2026-09-30"))
+        val tasks = listOf(
+            // 次回対象日 2026-10-02, snoozed until 10:00 on that day.
+            task.copy(id = 3, createdAt = at(1), recurrenceDays = 2, completions = yesterday)
+                .copy(snoozedUntil = now.plus(hour.multipliedBy(15))),
+            // 次回対象 20:00, snoozed until 23:00.
+            task.copy(id = 1, createdAt = at(3), recurrenceHours = 2, completions = anHourAgo)
+                .copy(snoozedUntil = now.plus(hour.multipliedBy(4))),
+            task.copy(id = 4, createdAt = at(0), recurrenceHours = 11, completions = anHourAgo),
+            task.copy(id = 2, createdAt = at(2), recurrenceHours = 3, completions = anHourAgo),
+        )
+        val sorted = sortTasks(tasks, TaskSortOrder.NEXT_DUE, now, zone)
+        assertEquals(listOf(1L, 2L, 3L, 4L), sorted.map { it.id })
+        assertEquals(
+            listOf("次回対象 2026-10-01 20:00", "次回対象 2026-10-01 21:00", "次回対象日 2026-10-02", "次回対象 2026-10-02 05:00"),
+            sorted.map { taskStatus(it, now, zone) },
+        )
+    }
+    @Test fun nextDueSortComparesDailyDatesWithHourlyTimesInTheDeviceTimeZone() {
+        // The daily task is due at 2026-10-02 00:00 in Tokyo, between 23:00 and 01:00.
+        val yesterday = completion(now.minus(Duration.ofDays(1)), "2026-09-30")
+        val daily = task.copy(id = 1, createdAt = at(0), recurrenceDays = 2, completions = listOf(yesterday))
+        val justNow = listOf(completion(now, "2026-10-01"))
+        val dueAt23 = task.copy(id = 2, createdAt = at(1), recurrenceHours = 4, completions = justNow)
+        val dueAt01 = task.copy(id = 3, createdAt = at(2), recurrenceHours = 6, completions = justNow)
+        val sorted = sortTasks(listOf(dueAt01, daily, dueAt23), TaskSortOrder.NEXT_DUE, now, zone)
+        assertEquals(listOf(2L, 1L, 3L), sorted.map { it.id })
     }
     @Test fun sortMenuStartsWithRegistrationOrder() {
         assertEquals(TaskSortOrder.REGISTERED, TaskSortOrder.entries.first())
@@ -116,4 +174,5 @@ class TaskPresentationTest {
     }
     private fun at(seconds: Long) = Instant.EPOCH.plusSeconds(seconds)
     private fun record(day: String) = CompletionRecord(1, Instant.EPOCH, LocalDate.parse(day))
+    private fun completion(at: Instant, day: String) = CompletionRecord(1, at, LocalDate.parse(day))
 }
