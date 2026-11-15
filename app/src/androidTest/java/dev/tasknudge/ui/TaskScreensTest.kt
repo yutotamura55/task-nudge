@@ -229,6 +229,28 @@ class TaskScreensTest {
         compose.onNodeWithText("並び替え：完了回数が多い順").assertIsDisplayed()
         assertEquals(listOf("肩", "首", "腕"), titlesFromTop("首", "肩", "腕"))
     }
+    @Test fun sortingByNextDuePutsTasksThatAreDueFirst() {
+        // 12:00 in Tokyo.
+        val clock = Clock.fixed(Instant.parse("2030-04-03T03:00:00Z"), ZoneOffset.UTC)
+        val now = clock.instant()
+        val anHourAgo = CompletionRecord(1, now.minusSeconds(3600), LocalDate.of(2030, 4, 3))
+        val repo = ScreenRepository(listOf(
+            sampleTask().copy(id = 1, title = "首", recurrenceHours = 2, completions = listOf(anHourAgo)),
+            sampleTask().copy(id = 2, title = "肩", completions = emptyList(), snoozedUntil = now.plusSeconds(5 * 3600)),
+            sampleTask().copy(id = 3, title = "腕", completions = emptyList()),
+        ))
+        compose.setContent {
+            TaskNudgeTheme(dynamicColor = false) {
+                TaskNudgeApp(repo, true, {}, clock = clock, zoneProvider = { ZoneId.of("Asia/Tokyo") })
+            }
+        }
+        assertEquals(listOf("首", "肩", "腕"), titlesFromTop("首", "肩", "腕"))
+        compose.onNodeWithText("並び替え：登録順").performClick()
+        compose.onNodeWithText("次回対象が近い順").assertIsNotSelected().performClick()
+        compose.onNodeWithText("並び替え：次回対象が近い順").assertIsDisplayed()
+        // 腕 is due now, 首 at 13:00 and 肩 at 17:00, when its snooze ends.
+        assertEquals(listOf("腕", "首", "肩"), titlesFromTop("首", "肩", "腕"))
+    }
     @Test fun sortMenuIsHiddenWhileThereAreNoTasks() {
         compose.setContent { TaskNudgeTheme(dynamicColor = false) { TaskListScreen(listContent(emptyList()), listActions()) } }
         compose.onNodeWithText("まだタスクがありません", substring = true).assertIsDisplayed()

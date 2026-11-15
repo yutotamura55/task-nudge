@@ -51,7 +51,9 @@ class TaskListActions(
 fun TaskListScreen(content: TaskListContent, actions: TaskListActions) {
     val today = content.now.atZone(content.zone).toLocalDate()
     val active = content.tasks.filterNot { it.archived }
-    val visible = sortTasks(visibleTasks(content.tasks, content.showArchived, content.query), content.sortOrder)
+    val visible = sortTasks(
+        visibleTasks(content.tasks, content.showArchived, content.query), content.sortOrder, content.now, content.zone,
+    )
     var searchExpanded by rememberSaveable { mutableStateOf(content.query.isNotEmpty()) }
     LazyColumn(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         item {
@@ -95,7 +97,8 @@ fun TaskListScreen(content: TaskListContent, actions: TaskListActions) {
             }, style = MaterialTheme.typography.bodyLarge)
         }
         items(visible, key = { it.id }) { task ->
-            // Completing a task can move it under the completion-count order; the animation shows where it went.
+            // Completing a task can move it under the completion-count and next-due orders,
+            // and a task moves up when it becomes due; the animation shows where it went.
             Box(Modifier.animateItem()) {
                 TaskRow(
                     task, content.canSubmit, content.now, content.zone,
