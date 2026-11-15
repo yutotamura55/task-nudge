@@ -132,6 +132,28 @@ class TaskPresentationTest {
             sorted.map { taskStatus(it, now, zone) },
         )
     }
+    @Test fun nextDueSortUsesTheWaitTheRowShowsEvenWhenASnoozeEndsLater() {
+        // Editing the recurrence keeps a snooze, so a row can show a wait that ends before the snooze does.
+        val hour = Duration.ofHours(1)
+        val anHourAgo = listOf(completion(now.minus(hour), "2026-10-01"))
+        val yesterday = listOf(completion(now.minus(Duration.ofDays(1)), "2026-09-30"))
+        val tasks = listOf(
+            // 次回対象日 2026-10-02, snoozed until 10:00 on that day.
+            task.copy(id = 3, createdAt = at(1), recurrenceDays = 2, completions = yesterday)
+                .copy(snoozedUntil = now.plus(hour.multipliedBy(15))),
+            // 次回対象 20:00, snoozed until 23:00.
+            task.copy(id = 1, createdAt = at(3), recurrenceHours = 2, completions = anHourAgo)
+                .copy(snoozedUntil = now.plus(hour.multipliedBy(4))),
+            task.copy(id = 4, createdAt = at(0), recurrenceHours = 11, completions = anHourAgo),
+            task.copy(id = 2, createdAt = at(2), recurrenceHours = 3, completions = anHourAgo),
+        )
+        val sorted = sortTasks(tasks, TaskSortOrder.NEXT_DUE, now, zone)
+        assertEquals(listOf(1L, 2L, 3L, 4L), sorted.map { it.id })
+        assertEquals(
+            listOf("次回対象 2026-10-01 20:00", "次回対象 2026-10-01 21:00", "次回対象日 2026-10-02", "次回対象 2026-10-02 05:00"),
+            sorted.map { taskStatus(it, now, zone) },
+        )
+    }
     @Test fun nextDueSortComparesDailyDatesWithHourlyTimesInTheDeviceTimeZone() {
         // The daily task is due at 2026-10-02 00:00 in Tokyo, between 23:00 and 01:00.
         val yesterday = completion(now.minus(Duration.ofDays(1)), "2026-09-30")

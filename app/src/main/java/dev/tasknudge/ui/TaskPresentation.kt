@@ -69,14 +69,20 @@ fun sortTasks(tasks: List<TaskSnapshot>, order: TaskSortOrder, now: Instant, zon
         },
     )
 
-/**
- * Orders by the time each task next becomes a reminder candidate, the time its row shows.
- * Stopped tasks never become one, so they come last. Each time is computed once, not on every comparison.
- */
+/** Orders by [shownDueAt], computed once per task rather than on every comparison; stopped tasks come last. */
 private fun nextDueOrder(tasks: List<TaskSnapshot>, now: Instant, zone: ZoneId): Comparator<TaskSnapshot> {
-    val today = now.atZone(zone).toLocalDate()
-    val dueAt = tasks.associate { it.id to it.reminderTask(today).nextDueAt(now, zone) }
+    val dueAt = tasks.associate { it.id to shownDueAt(it, now, zone) }
     return compareBy<TaskSnapshot, Instant?>(nullsLast()) { dueAt[it.id] }.then(registrationOrder)
+}
+
+/**
+ * The time [taskStatus] shows, picked in the same order: the recurrence wait, then the snooze, then [now].
+ * A 「今日完了」 row shows no time but waits for its next due date. Null for a stopped task.
+ */
+private fun shownDueAt(task: TaskSnapshot, now: Instant, zone: ZoneId): Instant? {
+    if (task.archived) return null
+    val rules = task.reminderTask(now.atZone(zone).toLocalDate())
+    return rules.recurrenceWaitEnd(now, zone) ?: task.snoozedUntil?.takeIf { rules.isSnoozed(now) } ?: now
 }
 
 /** Compares an hourly recurrence with a daily one by length, so 24 hours equals 1 day. */
