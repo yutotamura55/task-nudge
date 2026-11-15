@@ -246,8 +246,8 @@ class TaskScreensTest {
         }
         assertEquals(listOf("首", "肩", "腕"), titlesFromTop("首", "肩", "腕"))
         compose.onNodeWithText("並び替え：登録順").performClick()
-        compose.onNodeWithText("次回対象が近い順").assertIsNotSelected().performClick()
-        compose.onNodeWithText("並び替え：次回対象が近い順").assertIsDisplayed()
+        compose.onNodeWithText("次回通知が近い順").assertIsNotSelected().performClick()
+        compose.onNodeWithText("並び替え：次回通知が近い順").assertIsDisplayed()
         // 腕 is due now, 首 at 13:00 and 肩 at 17:00, when its snooze ends.
         assertEquals(listOf("腕", "首", "肩"), titlesFromTop("首", "肩", "腕"))
     }

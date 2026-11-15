@@ -15,7 +15,7 @@ class TaskPresentationTest {
         val today = task.copy(completions = listOf(record("2026-10-01")))
         assertEquals("今日完了", taskStatus(today, now, zone))
         val later = task.copy(completions = listOf(record("2026-10-05")))
-        assertEquals("次回対象日 2026-10-08", taskStatus(later, now, zone))
+        assertEquals("次回通知予定日 2026-10-08", taskStatus(later, now, zone))
     }
     @Test fun stoppedAndSnoozedAreLabeledWithoutColor() {
         assertEquals("停止中", taskStatus(task.copy(archived = true), now, zone))
@@ -24,7 +24,7 @@ class TaskPresentationTest {
     @Test fun hourlyTaskShowsNextTimeAndAllowsCompletionAfterInterval() {
         val completed = CompletionRecord(1, now.minus(Duration.ofHours(1)), LocalDate.parse("2026-10-01"))
         val hourly = task.copy(recurrenceDays = 1, recurrenceHours = 2, completions = listOf(completed))
-        assertEquals("次回対象 2026-10-01 20:00", taskStatus(hourly, now, zone))
+        assertEquals("次回通知予定 2026-10-01 20:00", taskStatus(hourly, now, zone))
         assertFalse(taskCanComplete(hourly, now, zone))
         assertTrue(taskCanComplete(hourly, now.plus(Duration.ofHours(1)), zone))
     }
@@ -49,7 +49,7 @@ class TaskPresentationTest {
     @Test fun dailyTaskCanBeCompletedOnTheNextDateBeforeItsRecurrenceIsDue() {
         val yesterday = task.copy(completions = listOf(record("2026-09-30")))
         assertTrue(taskCanComplete(yesterday, now, zone))
-        assertEquals("次回対象日 2026-10-03", taskStatus(yesterday, now, zone))
+        assertEquals("次回通知予定日 2026-10-03", taskStatus(yesterday, now, zone))
         val today = task.copy(completions = listOf(record("2026-10-01")))
         assertFalse(taskCanComplete(today, now, zone))
         assertFalse(taskCanComplete(today.copy(archived = true), now, zone))
@@ -126,8 +126,8 @@ class TaskPresentationTest {
         assertEquals(listOf(1L, 2L, 4L, 3L, 5L, 6L, 7L), sorted.map { it.id })
         assertEquals(
             listOf(
-                "実行できます", "実行できます", "次回対象 2026-10-01 20:00", "保留中・2026-10-01 22:00まで",
-                "次回対象日 2026-10-03", "今日完了", "停止中",
+                "実行できます", "実行できます", "次回通知予定 2026-10-01 20:00", "保留中・2026-10-01 22:00まで",
+                "次回通知予定日 2026-10-03", "今日完了", "停止中",
             ),
             sorted.map { taskStatus(it, now, zone) },
         )
@@ -138,10 +138,10 @@ class TaskPresentationTest {
         val anHourAgo = listOf(completion(now.minus(hour), "2026-10-01"))
         val yesterday = listOf(completion(now.minus(Duration.ofDays(1)), "2026-09-30"))
         val tasks = listOf(
-            // 次回対象日 2026-10-02, snoozed until 10:00 on that day.
+            // 次回通知予定日 2026-10-02, snoozed until 10:00 on that day.
             task.copy(id = 3, createdAt = at(1), recurrenceDays = 2, completions = yesterday)
                 .copy(snoozedUntil = now.plus(hour.multipliedBy(15))),
-            // 次回対象 20:00, snoozed until 23:00.
+            // 次回通知予定 20:00, snoozed until 23:00.
             task.copy(id = 1, createdAt = at(3), recurrenceHours = 2, completions = anHourAgo)
                 .copy(snoozedUntil = now.plus(hour.multipliedBy(4))),
             task.copy(id = 4, createdAt = at(0), recurrenceHours = 11, completions = anHourAgo),
@@ -150,7 +150,10 @@ class TaskPresentationTest {
         val sorted = sortTasks(tasks, TaskSortOrder.NEXT_DUE, now, zone)
         assertEquals(listOf(1L, 2L, 3L, 4L), sorted.map { it.id })
         assertEquals(
-            listOf("次回対象 2026-10-01 20:00", "次回対象 2026-10-01 21:00", "次回対象日 2026-10-02", "次回対象 2026-10-02 05:00"),
+            listOf(
+                "次回通知予定 2026-10-01 20:00", "次回通知予定 2026-10-01 21:00",
+                "次回通知予定日 2026-10-02", "次回通知予定 2026-10-02 05:00",
+            ),
             sorted.map { taskStatus(it, now, zone) },
         )
     }
