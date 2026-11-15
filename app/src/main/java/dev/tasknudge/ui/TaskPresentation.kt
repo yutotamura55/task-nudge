@@ -16,8 +16,8 @@ fun taskStatus(task: TaskSnapshot, now: Instant, zone: ZoneId): String {
     if (task.archived) return "停止中"
     val today = now.atZone(zone).toLocalDate()
     val rules = task.reminderTask(today)
-    if (!rules.canComplete(now)) return rules.nextCompletableAt?.let { "次回対象 ${formatDateTime(it, zone)}" } ?: "今日完了"
-    rules.nextDueDate?.takeIf { it.isAfter(today) }?.let { return "次回対象日 $it" }
+    if (!rules.canComplete(now)) return rules.nextCompletableAt?.let { "次回通知予定 ${formatDateTime(it, zone)}" } ?: "今日完了"
+    rules.nextDueDate?.takeIf { it.isAfter(today) }?.let { return "次回通知予定日 $it" }
     task.snoozedUntil?.takeIf { rules.isSnoozed(now) }?.let { return "保留中・${formatDateTime(it, zone)}まで" }
     return "実行できます"
 }
@@ -42,7 +42,7 @@ enum class TaskSortOrder(val label: String) {
     RECURRENCE_SHORTEST("繰り返しの間隔が短い順"),
     REGISTERED_NEWEST("登録日時が新しい順"),
     COMPLETIONS_MOST("完了回数が多い順"),
-    NEXT_DUE("次回対象が近い順"),
+    NEXT_DUE("次回通知が近い順"),
     ;
 
     companion object {
