@@ -195,6 +195,17 @@ class ReminderPolicyTest {
         assertNull(ReminderPolicy.select(listOf(ReminderTask(1, now)), now, zone, settings, now.plusSeconds(3600)))
     }
 
+    // Issue #83: a task whose notification still waits for the user's action is not notified again.
+    @Test fun taskAwaitingActionIsSkippedForTheNextCandidate() {
+        val tasks = listOf(ReminderTask(1, now.minusSeconds(86400)), ReminderTask(2, now))
+        assertEquals(2L, ReminderPolicy.select(tasks, now, zone, settings, null, awaitingActionTaskIds = setOf(1L)))
+    }
+
+    @Test fun noCandidateWhenEveryDueTaskAwaitsAction() {
+        val tasks = listOf(ReminderTask(1, now), ReminderTask(2, now))
+        assertNull(ReminderPolicy.select(tasks, now, zone, settings, null, awaitingActionTaskIds = setOf(1L, 2L)))
+    }
+
     @Test fun noEligibleCandidateReturnsNull() {
         assertNull(select(emptyList()))
         assertNull(select(listOf(ReminderTask(1, now, archived = true))))

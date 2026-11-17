@@ -133,14 +133,14 @@ class ReminderEngine(
         val zone = zoneProvider()
         if (!gateway.canNotify()) return
         val reminders = dao.activeReminders()
-        val lastByTask = reminders.filter { it.deliveredAt != null }
-            .groupBy { it.taskId }
-            .mapValues { (_, values) -> Instant.ofEpochMilli(values.maxOf { requireNotNull(it.deliveredAt) }) }
+        // After reconciliation, each row is a notification the OS still shows, or one that left the
+        // OS less than osVisibilityGrace ago and may still get its delete broadcast.
+        val awaitingAction = reminders.mapTo(mutableSetOf()) { it.taskId }
         val tasks = dao.tasks()
         val today = now.atZone(zone).toLocalDate()
         val id = ReminderPolicy.select(
             tasks.map { it.reminderTask(today) }, now, zone, settings,
-            dao.state().lastNotifiedAt?.let(Instant::ofEpochMilli), lastByTask,
+            dao.state().lastNotifiedAt?.let(Instant::ofEpochMilli), awaitingAction,
         ) ?: return
         val task = tasks.first { it.task.id == id }.task
         // Leave room below the platform's active-notification limit.
