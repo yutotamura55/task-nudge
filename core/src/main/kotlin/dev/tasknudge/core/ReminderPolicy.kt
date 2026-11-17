@@ -58,13 +58,17 @@ data class ReminderSettings(
 )
 
 object ReminderPolicy {
+    /**
+     * Chooses the task to notify at [now], or null. A task in [awaitingActionTaskIds] already has a
+     * notification waiting for the user's action, so it is not notified again until that one is gone.
+     */
     fun select(
         tasks: List<ReminderTask>,
         now: Instant,
         zone: ZoneId,
         settings: ReminderSettings,
         lastNotifiedAt: Instant?,
-        lastNotifiedByTask: Map<Long, Instant> = emptyMap(),
+        awaitingActionTaskIds: Set<Long> = emptySet(),
     ): Long? {
         if (!isWithinHours(now, zone, settings)) return null
         if (lastNotifiedAt != null &&
@@ -73,10 +77,9 @@ object ReminderPolicy {
 
         val today = now.atZone(zone).toLocalDate()
         return tasks.asSequence()
-            .filter { it.isDue(now, today) }
+            .filter { it.id !in awaitingActionTaskIds && it.isDue(now, today) }
             .minWithOrNull(
-                compareBy<ReminderTask> { lastNotifiedByTask[it.id] }
-                    .thenBy { if (it.snoozedUntil != null) 0 else 1 }
+                compareBy<ReminderTask> { if (it.snoozedUntil != null) 0 else 1 }
                     .thenBy { it.lastCompletedAt ?: it.createdAt }
                     .thenBy { it.createdAt }
                     .thenBy { it.id },

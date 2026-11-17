@@ -112,9 +112,11 @@ class ReminderSmokeTest {
         await { activeReminderCount() == 2 }
         assertEquals(second, secondNotice.notification.extras.getLong("taskId"))
 
+        // Issue #83: both notifications still wait for the user's action, so neither is repeated.
         app.fixedClock.instantValue = app.fixedClock.instantValue.plus(Duration.ofMinutes(16))
         app.container.engine.evaluate()
-        await { activeReminderCount() == 3 }
+        assertEquals(2, dao.activeReminders().size)
+        assertEquals(2, activeReminderCount())
         val complete = firstNotice.notification.actions.first { it.title.toString() == "完了" }.actionIntent
         complete.send()
         await { dao.taskWithCompletions(first)?.completions?.size == 1 && activeReminderCount() == 1 }

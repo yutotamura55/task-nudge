@@ -51,16 +51,25 @@ class ReminderEngineTest {
         assertEquals(1, gateway.posts)
         assertNotNull(db.dao().activeReminders().single().deliveredAt)
     }
-    @Test fun ignoredReminderDoesNotBlockLaterIntervals() = runTest {
+    // Issue #83: a notification still waiting for the user's action is not repeated, and it
+    // does not keep other tasks from being notified at later intervals.
+    @Test fun ignoredReminderIsNotRepeatedWhileItAwaitsAction() = runTest {
         repo.saveSettings(ReminderSettings(0, 24, 15))
-        repo.saveTask(null, "首")
+        val first = repo.saveTask(null, "首")
         repeat(4) {
             engine.evaluate()
             clock.advance(Duration.ofMinutes(15))
         }
-        assertEquals(4, gateway.posts)
+        assertEquals(1, gateway.posts)
+        assertEquals(listOf(first), db.dao().activeReminders().map { it.taskId })
+        val second = repo.saveTask(null, "腕")
+        engine.evaluate()
+        assertEquals(2, gateway.posts)
+        assertEquals(second, gateway.taskId)
+        clock.advance(Duration.ofMinutes(15)); engine.evaluate()
+        assertEquals(2, gateway.posts)
     }
-    @Test fun unnotifiedTaskGetsNextIntervalBeforeRepeatingFirst() = runTest {
+    @Test fun awaitingTaskYieldsTheNextIntervalToAnotherTask() = runTest {
         repo.saveSettings(ReminderSettings(0, 24, 15))
         val first = repo.saveTask(null, "首")
         val second = repo.saveTask(null, "腕")
@@ -89,7 +98,7 @@ class ReminderEngineTest {
     }
     @Test fun oneDelayedEvaluationDoesNotBackfillMissedIntervals() = runTest {
         repo.saveSettings(ReminderSettings(0, 24, 15))
-        repo.saveTask(null, "首")
+        repo.saveTasks(listOf(TaskInput("首", 1), TaskInput("腕", 1), TaskInput("脚", 1)))
         engine.evaluate()
         clock.advance(Duration.ofHours(3))
         engine.evaluate()
@@ -103,8 +112,7 @@ class ReminderEngineTest {
         val firstToken = gateway.visibleToken!!
         clock.advance(Duration.ofMinutes(15)); engine.evaluate()
         val secondToken = gateway.visibleToken!!
-        clock.advance(Duration.ofMinutes(15)); engine.evaluate()
-        assertEquals(3, gateway.activeCount)
+        assertEquals(2, gateway.activeCount)
         engine.handleAction(first, firstToken, ReminderAction.COMPLETE)
         assertEquals(1, gateway.activeCount)
         assertEquals(secondToken, gateway.visibleToken)
@@ -348,13 +356,12 @@ class ReminderEngineTest {
         assertEquals(clock.instant().plusSeconds(86400), repo.snapshots.first().tasks.single().snoozedUntil)
         assertTrue(db.dao().activeReminders().isEmpty())
     }
-    @Test fun dismissingOneTaskCancelsAllOfItsVisibleRemindersOnly() = runTest {
+    @Test fun dismissingOneTaskCancelsOnlyItsReminder() = runTest {
         repo.saveSettings(ReminderSettings(0, 24, 15))
         val first = repo.saveTask(null, "首"); val second = repo.saveTask(null, "腕")
         engine.evaluate(); val firstToken = gateway.visibleToken!!
         clock.advance(Duration.ofMinutes(15)); engine.evaluate()
-        clock.advance(Duration.ofMinutes(15)); engine.evaluate()
-        assertEquals(3, gateway.activeCount)
+        assertEquals(2, gateway.activeCount)
         engine.handleAction(first, firstToken, ReminderAction.SNOOZE)
         assertEquals(1, gateway.activeCount)
         assertEquals(listOf(second), db.dao().activeReminders().map { it.taskId })
@@ -472,10 +479,13 @@ class ReminderEngineTest {
         assertEquals(41, gateway.posts)
         assertEquals(replacement, gateway.activeTokens()[oldest.notificationId])
     }
-    /** Posts [count] reminders for two tasks, 15 minutes apart. 40 of them end the same day in Tokyo. */
+    /**
+     * Posts [count] reminders, 15 minutes apart, one for each of 41 tasks, so one task is left for
+     * the next evaluation. 41 of them end the same day in Tokyo.
+     */
     private suspend fun postRemindersEvery15Minutes(count: Int) {
         repo.saveSettings(ReminderSettings(0, 24, 15))
-        repo.saveTask(null, "首"); repo.saveTask(null, "腕")
+        repo.saveTasks(List(41) { TaskInput("タスク$it", 1) })
         repeat(count) {
             engine.evaluate()
             clock.advance(Duration.ofMinutes(15))
